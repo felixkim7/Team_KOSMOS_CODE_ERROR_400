@@ -93,6 +93,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 import json
 
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
+try:
+    import chromadb
+except Exception:
+    chromadb = None
+
 # 환경변수 로드
 load_dotenv()
 
@@ -152,11 +162,17 @@ class ChatbotService:
         - LangChain: from langchain.memory import ConversationSummaryBufferMemory
         """
         print("[ChatbotService] 초기화 중... ")
-        
-        # 여기에 초기화 코드 작성
-        self.config = {}
+        self.config = self._load_config()
+
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.client = None
-        self.collection = None
+        if api_key and OpenAI is not None:
+            try:
+                self.client = OpenAI(api_key=api_key)
+            except Exception as e:
+                print(f"[ChatbotService] OpenAI 클라이언트 초기화 실패: {e}")
+
+        self.collection = self._init_chromadb()
         self.memory = None
         
         print("[ChatbotService] 초기화 완료")
@@ -175,7 +191,19 @@ class ChatbotService:
             "system_prompt": {...}
         }
         """
-        pass
+        config_path = BASE_DIR / "config" / "chatbot_config.json"
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[ChatbotService] config 로드 실패: {e}")
+            return {
+                "name": "챗봇",
+                "system_prompt": {
+                    "base": "당신은 친절한 챗봇입니다.",
+                    "rules": ["정확하고 간결하게 답변하세요."],
+                },
+            }
     
     
     def _init_chromadb(self):
@@ -193,7 +221,18 @@ class ChatbotService:
         - client = chromadb.PersistentClient(path=str(db_path))
         - collection = client.get_collection(name="rag_collection")
         """
-        pass
+        if chromadb is None:
+            print("[ChatbotService] chromadb 패키지가 없어 RAG를 비활성화합니다.")
+            return None
+
+        db_path = BASE_DIR / "static" / "data" / "chatbot" / "chardb_embedding"
+        try:
+            db_path.mkdir(parents=True, exist_ok=True)
+            client = chromadb.PersistentClient(path=str(db_path))
+            return client.get_or_create_collection(name="rag_collection")
+        except Exception as e:
+            print(f"[ChatbotService] ChromaDB 초기화 실패: {e}")
+            return None
     
     
     def _create_embedding(self, text: str) -> list:
@@ -218,7 +257,14 @@ class ChatbotService:
         - )
         - return response.data[0].embedding
         """
-        pass
+        if self.client is None:
+            return []
+
+        response = self.client.embeddings.create(
+            input=[text],
+            model="text-embedding-3-large"
+        )
+        return response.data[0].embedding
     
     
     def _search_similar(self, query: str, threshold: float = 0.45, top_k: int = 5):
@@ -277,7 +323,36 @@ class ChatbotService:
         - 유사도 값 확인 (너무 낮으면 threshold 조정)
         - 검색된 문서 내용 확인
         """
-        pass
+        if self.collection is None or self.client is None:
+            return None, None, None
+
+        try:
+            query_embedding = self._create_embedding(query)
+            if not query_embedding:
+                return None, None, None
+
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+                include=["documents", "distances", "metadatas"],
+            )
+
+            documents = (results.get("documents") or [[]])[0]
+            distances = (results.get("distances") or [[]])[0]
+            metadatas = (results.get("metadatas") or [[]])[0]
+
+            best = (None, None, None)
+            for idx, (doc, dist) in enumerate(zip(documents, distances)):
+                similarity = 1 / (1 + float(dist))
+                if similarity >= threshold:
+                    meta = metadatas[idx] if idx < len(metadatas) else None
+                    if best[1] is None or similarity > best[1]:
+                        best = (doc, similarity, meta)
+
+            return best
+        except Exception as e:
+            print(f"[ChatbotService] RAG 검색 실패: {e}")
+            return None, None, None
     
     
     def _build_prompt(self, user_message: str, context: str = None, username: str = "사용자"):
@@ -309,7 +384,32 @@ class ChatbotService:
         사용자: 학식 추천해줘
         ```
         """
-        pass
+        system_prompt = self.config.get("system_prompt", {})
+        base = system_prompt.get("base", "당신은 친절한 챗봇입니다.")
+        rules = system_prompt.get("rules", [])
+        rules_text = "\n".join(f"- {rule}" for rule in rules)
+
+        prompt_parts = [
+            base,
+            "",
+            "[응답 규칙]",
+            rules_text if rules_text else "- 자연스럽고 도움이 되게 답하세요.",
+        ]
+
+        if context:
+            prompt_parts.extend([
+                "",
+                "[참고 정보]",
+                context,
+            ])
+
+        prompt_parts.extend([
+            "",
+            f"[{username}] {user_message}",
+            "[답변]",
+        ])
+
+        return "\n".join(prompt_parts)
     
     
     def generate_response(self, user_message: str, username: str = "사용자") -> dict:
@@ -438,8 +538,63 @@ class ChatbotService:
         # 위의 단계를 참고하여 자유롭게 설계하세요
         
         try:
-            # 구현 시작
-            pass
+            message = (user_message or "").strip()
+            if not message:
+                return {
+                    "reply": "메시지를 입력해줘!",
+                    "image": None,
+                }
+
+            if message.lower() == "init":
+                bot_name = self.config.get("name", "챗봇")
+                return {
+                    "reply": f"안녕! 나는 {bot_name}이야. 무엇이든 편하게 물어봐.",
+                    "image": None,
+                }
+
+            context, similarity, _metadata = self._search_similar(
+                query=message,
+                threshold=0.45,
+                top_k=5,
+            )
+
+            if self.client is None:
+                # API 키가 없는 개발 환경에서도 프론트 메시지 송수신은 확인할 수 있도록 폴백 응답 제공
+                fallback = "현재 OPENAI_API_KEY가 설정되지 않아 데모 응답으로 동작 중이야. .env를 확인해줘."
+                if context and similarity is not None:
+                    fallback += f"\n참고로 관련 정보(유사도 {similarity:.2f})를 찾았어: {context[:200]}"
+                return {
+                    "reply": fallback,
+                    "image": None,
+                }
+
+            prompt = self._build_prompt(
+                user_message=message,
+                context=context,
+                username=username,
+            )
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "당신은 한국어로 답변하는 친절한 캐릭터 챗봇입니다.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=500,
+            )
+            reply = (response.choices[0].message.content or "").strip()
+
+            if not reply:
+                reply = "지금은 답변을 만들지 못했어. 다시 한 번 물어봐줘."
+
+            return {
+                "reply": reply,
+                "image": None,
+            }
             
         except Exception as e:
             print(f"[ERROR] 응답 생성 실패: {e}")
