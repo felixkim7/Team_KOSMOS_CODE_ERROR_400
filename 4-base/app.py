@@ -93,12 +93,14 @@ def detail():
 @app.route('/chat')
 def chat():
     username = request.args.get('username', '사용자')
+    usergender = request.args.get('usergender', '미정')
     bot_name = config.get('name', '챗봇')
     image_files = get_image_files()
     
     return render_template('chat.html', 
                          bot_name=bot_name, 
                          username=username,
+                         usergender=usergender,
                          image_files=image_files)
 
 # API 엔드포인트: 챗봇 응답 생성
@@ -108,7 +110,7 @@ def api_chat():
         data = request.get_json()
         user_message = data.get('message', '')
         username = data.get('username', '사용자')
-        
+        usergender = data.get('usergender', '미정')
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
@@ -117,7 +119,7 @@ def api_chat():
         
         # 응답 생성
         chatbot = get_chatbot_service()
-        response = chatbot.generate_response(user_message, username)
+        response = chatbot.generate_response(user_message, username, usergender)
         
         return jsonify(response)
         
