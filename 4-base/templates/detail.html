@@ -122,13 +122,17 @@
         font-size: 1rem;
         color: #333;
       }
-      .usergender-area input {
+      .usergender-area select {
         padding: 8px 12px;
         font-size: 1rem;
         border: 2px solid #ddd;
         border-radius: 8px;
         width: 50%;
         transition: border 0.2s;
+      }
+      .usergender-area select:focus {
+        outline: none;
+        border-color: #764ba2;
       }
       .start-chat {
         display: block;
@@ -170,23 +174,34 @@
         <div class="bot-info">
           <h1>{{ bot.name }}</h1>
 
-          <div class="tags">
+          <!-- <div class="tags">
             {% for tag in bot.tags %}
             <span class="tag">{{ tag }}</span>
             {% endfor %}
-          </div>
+          </div> -->
         </div>
+
+        <div>프롤로그</div>
 
         <div class="username-area">
           <label for="username">이름:</label>
           <input type="text" id="username" placeholder="이름을 입력하세요" />
         </div>
-        <div class="usergender-area">
+        <!-- <div class="usergender-area">
           <label for="usergender">성별:</label>
           <input type="text" id="usergender" placeholder="성별을 입력하세요" />
+        </div> -->
+        <div class="usergender-area">
+          <label for="usergender">성별:</label>
+          <select name="usergender" id = "usergender">
+            <option value="">성별을 선택하세요</option>
+            <option value = "남성">남성</option>
+            <option value = "여성">여성</option>
+          </select>
+          <!-- <input type="text" id="usergender" placeholder="성별을 입력하세요" /> -->
         </div>  
 
-        <a href="#" class="start-chat" id="start-chat-btn">채팅 시작하기</a>
+        <a href="#" class="start-chat" id="start-chat-btn">우주 항해 시작하기</a>
       </div>
     </div>
 

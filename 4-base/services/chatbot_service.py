@@ -650,7 +650,7 @@ class ChatbotService:
 
             if is_triggered:
                 # 텍스트 중간중간 혹은 앞뒤에 노이즈 추가
-                reply = f"치...지직... {reply} ...칙... 오류... 감지...{usergender}"
+                reply = f"치...지직... {reply} ...칙... 오류... 감지..."
 
             if not reply:
                 reply = "지금은 답변을 만들지 못했어. 다시 한 번 물어봐줘."

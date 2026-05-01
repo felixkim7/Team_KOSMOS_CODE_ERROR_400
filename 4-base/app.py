@@ -81,13 +81,22 @@ def index():
 # 챗봇 상세정보 페이지
 @app.route('/detail')
 def detail():
+    username = request.args.get('username', '사용자')
+    usergender = request.args.get('usergender', '미정')
+
     bot_info = {
         'name': config.get('name', '챗봇'),
         'image': url_for('static', filename=config.get('thumbnail', 'images/hateslop/club_logo.png')),
         'description': config.get('description', ''),
         'tags': config.get('tags', ['#챗봇'])
     }
-    return render_template('detail.html', bot=bot_info)
+
+    return render_template(
+        'detail.html',
+        bot=bot_info,
+        username=username,
+        usergender=usergender
+    )
 
 # 채팅 화면
 @app.route('/chat')

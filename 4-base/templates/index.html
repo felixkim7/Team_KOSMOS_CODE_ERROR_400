@@ -3,120 +3,408 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ bot.name }} - 캐릭터 챗봇</title>
+    <title>{{ bot.name }} - 가제: "Code: 400-Error"</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='css/style.css') }}"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet"/>
     <style>
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
-        padding: 0;
-        font-family: "IBM Plex Sans KR", sans-serif;
         min-height: 100vh;
+        font-family: "IBM Plex Sans KR", sans-serif;
+        color: #dffcff;
+        background:
+          radial-gradient(circle at 70% 30%, rgba(0, 204, 255, 0.16), transparent 35%),
+          radial-gradient(circle at 20% 70%, rgba(0, 74, 130, 0.35), transparent 40%),
+          linear-gradient(135deg, #02060d 0%, #06111c 45%, #010308 100%);
         display: flex;
         align-items: center;
         justify-content: center;
-      }
-      .container {
-        max-width: 600px;
-        width: 90%;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         overflow: hidden;
       }
-      .header {
-        padding: 30px;
-        text-align: center;
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          linear-gradient(rgba(0, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 255, 0.035) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(circle, black 40%, transparent 80%);
+        pointer-events: none;
       }
-      .header h1 {
-        margin: 0 0 10px 0;
-        font-size: 2rem;
-        color: #333;
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(
+          transparent 0%,
+          rgba(0, 255, 255, 0.04) 50%,
+          transparent 100%
+        );
+        background-size: 100% 4px;
+        opacity: 0.45;
+        pointer-events: none;
+      }      
+
+      .modal-container {
+        position: relative;
+        width: min(92%, 620px);
+        padding: 1px;
+        border-radius: 22px;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 255, 0.9),
+          rgba(0, 88, 160, 0.15),
+          rgba(0, 229, 255, 0.55)
+        );
+        box-shadow:
+          0 0 36px rgba(0, 204, 255, 0.25),
+          inset 0 0 30px rgba(0, 204, 255, 0.08);
       }
-      .header p {
+
+      .modal-inner {
+        border-radius: 22px;
+        overflow: hidden;
+        background: rgba(3, 10, 18, 0.88);
+        backdrop-filter: blur(18px);
+        border: 1px solid rgba(124, 234, 255, 0.18);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px;
+        border-bottom: 1px solid rgba(0, 224, 255, 0.22);
+        background: rgba(0, 22, 36, 0.75);
+      }
+
+      .modal-header h2 {
         margin: 0;
-        color: #666;
-        font-size: 0.9rem;
+        font-family: "Orbitron", sans-serif;
+        letter-spacing: 0.18em;
+        font-size: 0.95rem;
+        color: #8ff6ff;
+        text-shadow: 0 0 12px rgba(0, 229, 255, 0.9);
       }
-      .card {
-        padding: 40px;
-        text-align: center;
+
+      .status {
+        font-size: 0.75rem;
+        color: #ff4d6d;
+        letter-spacing: 0.12em;
+        animation: blink 1.4s infinite;
       }
-      .card img {
-        width: 200px;
-        height: 200px;
-        object-fit: cover;
+
+      .close-btn {
+        background: transparent;
+        border: 1px solid rgba(143, 246, 255, 0.35);
+        color: #8ff6ff;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: 0.2s;
       }
-      .card h2 {
-        margin: 10px 0;
-        font-size: 1.8rem;
-        color: #333;
+
+      .close-btn:hover {
+        background: rgba(0, 229, 255, 0.15);
+        box-shadow: 0 0 14px rgba(0, 229, 255, 0.5);
       }
-      .tags {
-        margin: 15px 0;
+
+      .modal-content {
+        padding: 34px;
       }
-      .tag {
-        display: inline-block;
-        background: #e0e0e0;
-        color: #555;
-        padding: 6px 12px;
-        border-radius: 15px;
-        margin: 4px;
-        font-size: 0.9rem;
+
+      .ai-core {
+        width: 160px;
+        height: 160px;
+        margin: 0 auto 26px;
+        border-radius: 50%;
+        position: relative;
+        background:
+          radial-gradient(circle, rgba(190, 255, 255, 1) 0%, rgba(0, 229, 255, 0.75) 18%, rgba(0, 97, 150, 0.28) 48%, transparent 70%);
+        box-shadow:
+          0 0 24px rgba(0, 229, 255, 0.9),
+          0 0 70px rgba(0, 153, 255, 0.45);
+        animation: pulse 2.6s infinite ease-in-out;
       }
-      .description {
-        margin: 20px 0;
-        color: #666;
-        line-height: 1.6;
+
+      .ai-core::before,
+      .ai-core::after {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        border-radius: 50%;
+        border: 1px solid rgba(155, 245, 255, 0.6);
       }
-      .start-btn {
-        display: inline-block;
-        margin-top: 20px;
-        padding: 15px 40px;
-        color: white;
-        background: #764ba2;
-        text-decoration: none;
-        border-radius: 25px;
-        font-size: 1.1rem;
-        font-weight: 600;
-        transition: transform 0.2s, box-shadow 0.2s;
+
+      .ai-core::after {
+        inset: 34px;
+        border-style: dashed;
+        animation: rotate 12s linear infinite;
       }
-      .start-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-      }
-      .footer {
-        padding: 20px;
+
+      .bot-info {
         text-align: center;
-        background: #f7f7f7;
-        color: #999;
-        font-size: 0.85rem;
+      }
+
+      .bot-info h1 {
+        margin: 0;
+        font-family: "Orbitron", sans-serif;
+        font-size: 2.45rem;
+        letter-spacing: 0.16em;
+        color: #e8feff;
+        text-shadow:
+          0 0 8px rgba(0, 229, 255, 0.9),
+          0 0 22px rgba(0, 120, 255, 0.7);
+      }
+
+      .subtitle {
+        margin: 12px 0 24px;
+        color: #86dff2;
+        font-size: 0.95rem;
+        line-height: 1.7;
+      }
+
+      .warning-box {
+        margin: 22px 0;
+        padding: 14px 16px;
+        border: 1px solid rgba(255, 68, 105, 0.45);
+        background: rgba(95, 0, 20, 0.18);
+        color: #ff9caf;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        border-radius: 12px;
+        box-shadow: inset 0 0 20px rgba(255, 68, 105, 0.06);
+      }
+
+      .input-panel {
+        margin-top: 24px;
+        padding: 20px;
+        border: 1px solid rgba(0, 229, 255, 0.22);
+        border-radius: 16px;
+        background: rgba(0, 26, 42, 0.55);
+      }
+
+      .form-row {
+        margin-bottom: 16px;
+      }
+
+      .form-row label {
+        display: block;
+        margin-bottom: 7px;
+        color: #9df7ff;
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+      }
+
+      .form-row input,
+      .form-row select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 229, 255, 0.35);
+        background: rgba(0, 7, 15, 0.86);
+        color: #e8feff;
+        font-size: 1rem;
+        outline: none;
+        transition: 0.2s;
+      }
+
+      .form-row input:focus,
+      .form-row select:focus {
+        border-color: #00e5ff;
+        box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+      }
+
+      .start-chat {
+        display: block;
+        width: 100%;
+        margin-top: 22px;
+        padding: 15px 20px;
+        border-radius: 12px;
+
+        /* darker border */
+        border: 1px solid rgba(0, 229, 255, 0.4);
+
+        /* darker blue gradient */
+        background: linear-gradient(90deg, #001923, #003a5a, #001923);
+
+        /* brighter text */
+        color: #bfffff;
+
+        font-weight: 700;
+        text-decoration: none;
+        text-align: center;
+        letter-spacing: 0.12em;
+
+        /* stronger glow */
+        box-shadow:
+          0 0 20px rgba(0, 229, 255, 0.6),
+          inset 0 0 18px rgba(0, 229, 255, 0.25);
+
+        transition: 0.2s;
+      }
+
+      .start-chat:hover {
+        transform: translateY(-2px);
+        box-shadow:
+          0 0 28px rgba(0, 229, 255, 0.75),
+          inset 0 0 18px rgba(255, 255, 255, 0.35);
+      }
+
+      .system-line {
+        margin-top: 20px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.72rem;
+        color: rgba(143, 246, 255, 0.58);
+        text-align: center;
+        letter-spacing: 0.14em;
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.85;
+        }
+        50% {
+          transform: scale(1.06);
+          opacity: 1;
+        }
+      }
+
+      @keyframes rotate {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes blink {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .modal-content {
+          padding: 26px 20px;
+        }
+
+        .bot-info h1 {
+          font-size: 1.9rem;
+        }
+
+        .ai-core {
+          width: 130px;
+          height: 130px;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div class="header">
-        <h1>모든 스타일 자유롭게 바꾸시면 됩니다.</h1>
+    <div class="modal-container">
+      <div class="modal-inner">
+        <div class="modal-header">
+          <span class="status">WARNING: ROUTE DEVIATION</span>
+          <h2>{{ bot.name }}</h2>
+          <button
+            class="close-btn"
+            onclick="history.back()"
+          >
+            &times;
+          </button>
+        </div>
       </div>
-      <div class="card" style="flex-direction: column; align-items: center">
-        <img
-          src="./static/images/hateslop/logo_black_genai.png"
-          alt="{{ bot.name }}"
-        />
-        <a href="{{ url_for('detail') }}" class="start-btn">시작하기</a>
+
+      <div class="modal-content">
+        <div class="ai-core"></div>
+
+        <div class="bot-info">
+          <h1>HS-004</h1>
+          <p class="subtitle">
+            화성 정착 계획 10년차.<br />
+            당신은 기억을 잃은 채 노후 화물선 안에서 깨어났습니다.
+          </p>
+
+          <!-- <div class="tags">
+            {% for tag in bot.tags %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+          </div> -->
+        </div>
+
+        <div class="warning-box">
+          SYSTEM NOTICE: 산소 수치 불안정. 항로 데이터 손상 감지.
+          HS-004의 안내에 따라 신원 정보를 입력하십시오.
+        </div>
+
+        <!-- <div class="username-area">
+          <label for="username">이름:</label>
+          <input type="text" id="username" placeholder="이름을 입력하세요" />
+        </div>
+
+        <div class="usergender-area">
+          <label for="usergender">성별:</label>
+          <select name="usergender" id = "usergender">
+            <option value="">성별을 선택하세요</option>
+            <option value = "남성">남성</option>
+            <option value = "여성">여성</option>
+          </select>
+        </div>   -->
+
+        <div class="input-panel">
+          <div class="form-row">
+            <label for="username">CREW NAME</label>
+            <input type="text" id="username" />
+          </div>
+
+          <div class="form-row">
+            <label for="usergender">CREW GENDER</label>
+            <select name="usergender" id="usergender">
+              <option value="">성별을 선택하세요</option>
+              <option value="남성">남성</option>
+              <option value="여성">여성</option>
+            </select>
+          </div>
+        </div>
+
+        <a href="#" class="start-chat" id="start-chat-btn">우주 항해 시작하기</a>
+        <div class="system-line">
+          HS-004 // AUTONOMOUS CARGO CONTROL SYSTEM
+        </div>
       </div>
     </div>
+
+    <script>
+      const startChatBtn = document.getElementById("start-chat-btn");
+      const usernameInput = document.getElementById("username");
+      const usergenderInput = document.getElementById("usergender");
+
+      startChatBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+        const username = usernameInput.value.trim() || "사용자";
+        const usergender = usergenderInput.value.trim() || "미정";
+        window.location.href = `/detail?username=${encodeURIComponent(username)}&usergender=${encodeURIComponent(usergender)}`;
+      });
+
+      usernameInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+          startChatBtn.click();
+        }
+      });
+    </script>
   </body>
 </html>

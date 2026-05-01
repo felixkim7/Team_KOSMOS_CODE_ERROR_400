@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ bot.name }} - 캐릭터 챗봇</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='css/style.css') }}"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "IBM Plex Sans KR", sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .container {
+        max-width: 600px;
+        width: 90%;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+      .header {
+        padding: 30px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0 0 10px 0;
+        font-size: 2rem;
+        color: #333;
+      }
+      .header p {
+        margin: 0;
+        color: #666;
+        font-size: 0.9rem;
+      }
+      .card {
+        padding: 40px;
+        text-align: center;
+      }
+      .card img {
+        width: 200px;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      }
+      .card h2 {
+        margin: 10px 0;
+        font-size: 1.8rem;
+        color: #333;
+      }
+      .tags {
+        margin: 15px 0;
+      }
+      .tag {
+        display: inline-block;
+        background: #e0e0e0;
+        color: #555;
+        padding: 6px 12px;
+        border-radius: 15px;
+        margin: 4px;
+        font-size: 0.9rem;
+      }
+      .description {
+        margin: 20px 0;
+        color: #666;
+        line-height: 1.6;
+      }
+      .start-btn {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 15px 40px;
+        color: white;
+        background: #764ba2;
+        text-decoration: none;
+        border-radius: 25px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .start-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      }
+      .footer {
+        padding: 20px;
+        text-align: center;
+        background: #f7f7f7;
+        color: #999;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>모든 스타일 자유롭게 바꾸시면 됩니다.</h1>
+      </div>
+      <div class="card" style="flex-direction: column; align-items: center">
+        <img
+          src="./static/images/hateslop/logo_black_genai.png"
+          alt="{{ bot.name }}"
+        />
+        <a href="{{ url_for('detail') }}" class="start-btn">시작하기</a>
+      </div>
+    </div>
+  </body>
+</html>
