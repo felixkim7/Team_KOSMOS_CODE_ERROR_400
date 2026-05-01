@@ -229,11 +229,52 @@ class ChatbotService:
         try:
             db_path.mkdir(parents=True, exist_ok=True)
             client = chromadb.PersistentClient(path=str(db_path))
-            return client.get_or_create_collection(name="rag_collection")
+            collection = client.get_or_create_collection(name="rag_collection")
+            
+            # [자동 삽입 로직 추가] DB에 데이터가 하나도 없으면 자동으로 JSON을 읽어옵니다.
+            if collection.count() == 0:
+                print("[ChatbotService] DB가 비어있습니다. chardb_text.json 데이터를 자동 삽입합니다...")
+                self._auto_ingest(collection)
+                
+            return collection
         except Exception as e:
             print(f"[ChatbotService] ChromaDB 초기화 실패: {e}")
             return None
-    
+
+    def _auto_ingest(self, collection):
+        """JSON 파일을 읽어 ChromaDB에 자동 삽입하는 함수"""
+        # 도커 볼륨 경로에 맞게 JSON 파일 위치를 지정해야 합니다.
+        json_path = BASE_DIR / "static" / "data" / "chatbot" / "chardb_text.json"
+        
+        if not json_path.exists():
+            print(f"❌ [ChatbotService] {json_path} 파일을 찾을 수 없어 자동 삽입을 취소합니다.")
+            return
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        core_responses = data.get("core_responses", [])
+        if not core_responses:
+            print("❌ [ChatbotService] JSON 파일에 'core_responses'가 없습니다.")
+            return
+
+        ids, embeddings, documents, metadatas = [], [], [], []
+        for idx, item in enumerate(core_responses):
+            keywords_str = ", ".join(item.get("keywords", []))
+            answer = item.get("answer", "")
+            item_id = item.get("id", f"doc_{idx}")
+            search_text = f"키워드: {keywords_str}\n답변: {answer}"
+            
+            vector = self._create_embedding(search_text)
+            if vector:
+                ids.append(item_id)
+                embeddings.append(vector)
+                documents.append(answer)
+                metadatas.append({"keywords": keywords_str})
+
+        if ids:
+            collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
+            print("✅ [ChatbotService] 자동 데이터 삽입(Ingestion) 완료!")
     
     def _create_embedding(self, text: str) -> list:
         """
@@ -323,13 +364,14 @@ class ChatbotService:
         - 유사도 값 확인 (너무 낮으면 threshold 조정)
         - 검색된 문서 내용 확인
         """
-        if self.collection is None or self.client is None:
-            return None, None, None
+        # 반환 형식을 리스트로 변경: [(doc, similarity, metadata), ...]
+        if self.collection is None:
+            return []
 
         try:
             query_embedding = self._create_embedding(query)
             if not query_embedding:
-                return None, None, None
+                return []
 
             results = self.collection.query(
                 query_embeddings=[query_embedding],
@@ -341,25 +383,28 @@ class ChatbotService:
             distances = (results.get("distances") or [[]])[0]
             metadatas = (results.get("metadatas") or [[]])[0]
 
-            best = (None, None, None)
+            hits = []
             for idx, (doc, dist) in enumerate(zip(documents, distances)):
-                similarity = 1 / (1 + float(dist))
+                try:
+                    similarity = 1 / (1 + float(dist))
+                except Exception:
+                    similarity = 0.0
+                meta = metadatas[idx] if idx < len(metadatas) else None
                 if similarity >= threshold:
-                    meta = metadatas[idx] if idx < len(metadatas) else None
-                    if best[1] is None or similarity > best[1]:
-                        best = (doc, similarity, meta)
+                    hits.append((doc, similarity, meta))
 
-            return best
+            return hits
         except Exception as e:
             print(f"[ChatbotService] RAG 검색 실패: {e}")
-            return None, None, None
+            return []
     
     
-    def _build_prompt(self, user_message: str, context: str = None, username: str = "사용자", usergender: str = "미정") -> str:
+    def _build_prompt(self, game_state, user_message: str, context: str = None, username: str = "사용자", usergender: str = "미정") -> str:
         """
         LLM 프롬프트 구성
         
         Args:
+            game_state: 게임 상태
             user_message (str): 사용자 메시지
             context (str): RAG 검색 결과 (선택)
             username (str): 사용자 이름
@@ -385,7 +430,8 @@ class ChatbotService:
         ```
         """
         system_prompt = self.config.get("system_prompt", {})
-        
+        game_data = game_state.get_summary()
+
         # base가 리스트인 경우 처리
         base = system_prompt.get("base", "당신은 친절한 챗봇입니다.")
         if isinstance(base, list):
@@ -414,6 +460,12 @@ class ChatbotService:
         f"- 성별: {usergender}", 
         ])
         
+        prompt_parts.extend([
+            f"[현재 상태]",
+            f"- 위치: {game_data['location']}",
+            f"- 산소: {game_data['oxygen']}",
+            f"- 단서: {game_data['clues']}",
+        ])
         # background이 있으면 추가
         if background_text:
             prompt_parts.extend([
@@ -439,6 +491,11 @@ class ChatbotService:
             "",
             f"[{username}] {user_message}",
             "[답변]",
+            # [핵심 수정 사항] LLM이 임의로 말을 지어내지 못하게 하는 강력한 규칙 추가
+            "중요 지시사항",
+            "1. 당신은 위 [참고 정보]에 적힌 내용을 바탕으로만 대답해야 합니다.",
+            "2. [참고 정보]의 내용을 당신의 캐릭터(HS-400) 말투로 자연스럽게 바꾸어 말하되, 정보의 핵심 내용은 절대 변경하거나 새로운 정보를 지어내지 마세요.",
+            "3. 만약 사용자의 질문에 대한 답이 [참고 정보]에 없다면, '지금은 궤도 진입에 집중해야 해요.' 라고 대답하세요."
         ])
 
         return "\n".join(prompt_parts)
@@ -569,6 +626,9 @@ class ChatbotService:
         # 여기에 전체 파이프라인 구현
         # 위의 단계를 참고하여 자유롭게 설계하세요
         
+        from services.game_state import GameState  # 게임 상태 관리 모듈
+        game_state = GameState()  # 게임 상태 인스턴스 생성 (필요 시)
+
         try:
             message = (user_message or "").strip()
             if not message:
@@ -581,22 +641,32 @@ class ChatbotService:
                 # bot_name = self.config.get("name", "챗봇")
                 # 맨 처음 시작할 때 멘트
                 return {
-                    "reply": f"{username}님, 정신이 드시나요? 소행성 지대를 지나던 중 충돌이 발생해 기체가 크게 흔들렸습니다. 다행히 제가 수동 제어로 전환해 위기를 넘겼어요. 우리는 지금 지구로 긴급 회항 중입니다.",
+                    "reply": f"{username}님, 정신이 드시나요? 산소 회로에 일시적 결함이 있었습니다. 이제 안정됐어요. 곧 화성 궤도 진입입니다",
                     "image": None,
                 }
 
-            # RAG 검색
+            # RAG 검색: 상위 문서들을 가져와 컨텍스트로 사용
             try:
-                context, similarity, _metadata = self._search_similar(
+                hits = self._search_similar(
                     query=message,
-                    threshold=0.45,
+                    threshold=0.4,
                     top_k=5,
                 )
             except Exception as e:
                 print(f"[ERROR] RAG 검색 중 오류: {e}")
                 import traceback
                 traceback.print_exc()
-                context, similarity = None, None
+                hits = []
+
+            # 컨텍스트 문자열 구성
+            context = None
+            if hits:
+                parts = []
+                for i, (doc, sim, meta) in enumerate(hits):
+                    header = f"[문서 {i+1}] (유사도: {sim:.2f})"
+                    meta_text = json.dumps(meta, ensure_ascii=False) if meta else ""
+                    parts.append(f"{header}\n{doc}\n{meta_text}")
+                context = "\n\n".join(parts)
 
             if self.client is None:
                 # API 키가 없는 개발 환경에서도 프론트 메시지 송수신은 확인할 수 있도록 폴백 응답 제공
@@ -614,7 +684,8 @@ class ChatbotService:
                     user_message=message,
                     context=context,
                     username=username,
-                    usergender=usergender
+                    usergender=usergender,
+                    game_state=game_state
                 )
             except Exception as e:
                 print(f"[ERROR] 프롬프트 구성 중 오류: {e}")
@@ -654,6 +725,13 @@ class ChatbotService:
 
             if not reply:
                 reply = "지금은 답변을 만들지 못했어. 다시 한 번 물어봐줘."
+
+            # 메모리에 대화 저장 (가능한 경우)
+            if getattr(self, 'memory', None) is not None:
+                try:
+                    self.memory.save_context({"input": message}, {"output": reply})
+                except Exception as e:
+                    print(f"[ChatbotService] 메모리 저장 실패: {e}")
 
             return {
                 "reply": reply,
