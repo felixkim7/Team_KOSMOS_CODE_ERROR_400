@@ -4,16 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ bot_name }}와 대화하기</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Orbitron:wght@500;700&display=swap"
       rel="stylesheet"
     />
+
     <link
       href="{{ url_for('static', filename='css/style.css') }}"
       rel="stylesheet"
     />
+
     <style>
       * {
         box-sizing: border-box;
@@ -279,56 +282,32 @@
       .message::after {
         content: "";
         position: absolute;
-        bottom: -11px;
+        bottom: -12px;
         width: 18px;
         height: 18px;
-        background: inherit !important;
+        background: inherit;
+        border-bottom: 2px solid rgba(105, 210, 255, 0.9);
+        border-right: 2px solid rgba(105, 210, 255, 0.9);
+        transform: rotate(45deg);
       }
 
-      /* AI / bot bubble */
       .message.bot {
         margin-right: auto;
-        margin-left: 0;
       }
 
-      /* AI tail points toward the AI side / left side */
       .message.bot::after {
-        left: -11px !important;
-        top: 22px !important;
-        bottom: auto !important;
-        right: auto !important;
-
-        border-left: 2px solid rgba(105, 210, 255, 0.9) !important;
-        border-bottom: 2px solid rgba(105, 210, 255, 0.9) !important;
-        border-right: none !important;
-        border-top: none !important;
-
-        transform: rotate(45deg) !important;
+        left: 26px;
       }
 
-      /* User bubble */
       .message.user {
         margin-left: auto;
-        margin-right: 0;
         color: #dffcff;
         background: rgba(8, 35, 62, 0.78);
       }
 
-      /* User tail points toward the user side / right side */
       .message.user::after {
-        right: -11px !important;
-        top: 22px !important;
-        bottom: auto !important;
-        left: auto !important;
-
-        border-right: 2px solid rgba(105, 210, 255, 0.9) !important;
-        border-top: 2px solid rgba(105, 210, 255, 0.9) !important;
-        border-left: none !important;
-        border-bottom: none !important;
-
-        transform: rotate(45deg) !important;
+        right: 26px;
       }
-
 
       .message.system {
         margin: 18px auto;
@@ -529,6 +508,7 @@
       }
     </style>
   </head>
+
   <body>
     <div
       class="game-shell"
@@ -651,6 +631,241 @@
       </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+    <script>
+      const gameShell = document.querySelector(".game-shell");
+      const username = gameShell.dataset.username || "사용자";
+      const usergender = gameShell.dataset.usergender || "미정";
+
+      const chatLog = document.getElementById("chat-log");
+      const userMessageInput = document.getElementById("user-message");
+      const sendBtn = document.getElementById("send-btn");
+
+      const airLevelText = document.getElementById("air-level");
+      const timerCard = document.getElementById("timer-card");
+      const timerValue = document.getElementById("timer-value");
+
+      const cargoBtn = document.getElementById("cargo-btn");
+      const cockpitBtn = document.getElementById("cockpit-btn");
+
+      const hintRow = document.getElementById("hint-row");
+      const areaViewer = document.getElementById("area-viewer");
+      const areaTitle = document.getElementById("area-title");
+      const areaImage = document.getElementById("area-image");
+      const areaPlaceholder = document.getElementById("area-placeholder");
+
+      let currentStage = 1;
+      let airLevel = 20;
+      let timerStarted = false;
+      let timerSeconds = 10 * 60;
+      let openedArea = null;
+
+      const areaData = {
+        living: {
+          title: "LIVING AREA",
+          image: "{{ url_for('static', filename='images/chatbot/living_area.png') }}",
+        },
+        cargo: {
+          title: "CARGO BAY",
+          image: "{{ url_for('static', filename='images/chatbot/cargo_bay.png') }}",
+        },
+        cockpit: {
+          title: "COCKPIT",
+          image: "{{ url_for('static', filename='images/chatbot/cockpit.png') }}",
+        },
+      };
+
+      const hintsByStage = {
+        1: [
+          "내가 얼마나 잤지?",
+          "지금 어디쯤이야?",
+          "산소는 왜 떨어진 거지?",
+        ],
+        2: [
+          "화물칸에 뭐가 실려 있어?",
+          "산소 탱크가 손상된 것 같은데?",
+          "왜 비상 식량이 거의 없지?",
+        ],
+        3: [
+          "속도가 너무 빠른데?",
+          "너 지구로 가려는 목적이 뭐야?",
+          "궤도 좌표를 다시 보여줘.",
+        ],
+      };
+
+      function addMessage(sender, text) {
+        const message = document.createElement("div");
+        message.classList.add("message", sender);
+        message.textContent = text;
+        chatLog.appendChild(message);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      function updateHints() {
+        hintRow.innerHTML = "";
+
+        hintsByStage[currentStage].forEach((question) => {
+          const btn = document.createElement("button");
+          btn.className = "hint-btn";
+          btn.dataset.question = question;
+          btn.textContent = question;
+          hintRow.appendChild(btn);
+        });
+      }
+
+      function unlockStage(stage) {
+        currentStage = Math.max(currentStage, stage);
+
+        if (currentStage >= 2) {
+          cargoBtn.classList.remove("locked");
+        }
+
+        if (currentStage >= 3) {
+          cockpitBtn.classList.remove("locked");
+          startTimer();
+        }
+
+        updateHints();
+      }
+
+      function reduceAirLevel(amount = 1) {
+        airLevel = Math.max(0, airLevel - amount);
+        airLevelText.textContent = airLevel;
+
+        if (airLevel <= 10) {
+          airLevelText.style.color = "#ff9caf";
+        }
+
+        if (airLevel <= 5) {
+          addMessage("system", "SYSTEM: CRITICAL OXYGEN WARNING");
+        }
+      }
+
+      function startTimer() {
+        if (timerStarted) return;
+
+        timerStarted = true;
+        timerCard.classList.remove("hidden");
+
+        setInterval(() => {
+          timerSeconds = Math.max(0, timerSeconds - 1);
+
+          const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
+          const seconds = String(timerSeconds % 60).padStart(2, "0");
+
+          timerValue.textContent = `${minutes}:${seconds}`;
+
+          if (timerSeconds === 0) {
+            addMessage("system", "SYSTEM: EARTH ORBIT COLLISION IMMINENT");
+          }
+        }, 1000);
+      }
+
+      function toggleArea(areaKey) {
+        if (openedArea === areaKey) {
+          areaViewer.classList.remove("active");
+          openedArea = null;
+          return;
+        }
+
+        const area = areaData[areaKey];
+        openedArea = areaKey;
+
+        areaTitle.textContent = area.title;
+        areaImage.src = area.image;
+        areaImage.style.display = "block";
+        areaPlaceholder.style.display = "none";
+
+        areaImage.onerror = () => {
+          areaImage.style.display = "none";
+          areaPlaceholder.style.display = "block";
+        };
+
+        areaViewer.classList.add("active");
+      }
+
+      async function sendMessage() {
+        const message = userMessageInput.value.trim();
+
+        if (!message) return;
+
+        areaViewer.classList.remove("active");
+        openedArea = null;
+
+        addMessage("user", message);
+        userMessageInput.value = "";
+
+        reduceAirLevel(1);
+
+        if (
+          message.includes("화물칸") ||
+          message.includes("비상 식량") ||
+          message.includes("산소 탱크")
+        ) {
+          unlockStage(2);
+        }
+
+        if (
+          message.includes("조종실") ||
+          message.includes("궤도") ||
+          message.includes("속도") ||
+          message.includes("지구")
+        ) {
+          unlockStage(3);
+        }
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message,
+              username,
+              usergender,
+            }),
+          });
+
+          const data = await response.json();
+
+          addMessage("bot", data.reply || "응답을 생성할 수 없습니다.");
+        } catch (error) {
+          addMessage(
+            "system",
+            "SYSTEM ERROR: HS-400 응답 모듈과 연결할 수 없습니다."
+          );
+        }
+      }
+
+      document.querySelectorAll(".location-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          toggleArea(btn.dataset.area);
+        });
+      });
+
+      hintRow.addEventListener("click", (event) => {
+        if (event.target.classList.contains("hint-btn")) {
+          userMessageInput.value = event.target.dataset.question;
+          userMessageInput.focus();
+        }
+      });
+
+      sendBtn.addEventListener("click", sendMessage);
+
+      userMessageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+
+      updateHints();
+    </script>
+
+    <!-- 
+      If your original static/js/chatbot.js also handles sending messages,
+      remove the line below to avoid duplicate message sending.
+    -->
+    <!-- <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script> -->
   </body>
 </html>

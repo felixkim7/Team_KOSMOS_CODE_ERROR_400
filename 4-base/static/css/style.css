@@ -104,13 +104,22 @@ header {
 }
 
 #chat-log {
-  flex: 1;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  min-height: 0;
+  padding: 44px 34px 26px;
   overflow-y: auto;
-  padding: 15px;
-  background: #fafafa;
-  margin-bottom: 10px;
+
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.chat-panel {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  background: rgba(4, 2, 16, 0.78) !important;
+  position: relative;
 }
 
 .message {
@@ -127,11 +136,22 @@ header {
 }
 
 .message.bot {
-  background: #f0f0f0;
-  color: #333;
-  padding: 10px;
-  border-radius: 8px;
-  word-break: break-all;
+  background: rgba(0, 20, 38, 0.74) !important;
+  color: #6cecff !important;
+  border-color: rgba(105, 210, 255, 0.9) !important;
+  box-shadow:
+    0 0 16px rgba(0, 229, 255, 0.18),
+    inset 0 0 18px rgba(0, 229, 255, 0.07) !important;
+}
+
+.message.bot::after {
+  background: rgba(0, 20, 38, 0.74) !important;
+  border-bottom-color: rgba(105, 210, 255, 0.9) !important;
+  border-right-color: rgba(105, 210, 255, 0.9) !important;
+}
+
+.message.bot .bot-text-container {
+  color: #6cecff !important;
 }
 
 .bot-big-img {
