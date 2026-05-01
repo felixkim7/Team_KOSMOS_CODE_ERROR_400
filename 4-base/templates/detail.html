@@ -111,6 +111,25 @@
         outline: none;
         border-color: #764ba2;
       }
+      .usergender-area {
+        margin: 20px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .usergender-area label {
+        font-size: 1rem;
+        color: #333;
+      }
+      .usergender-area input {
+        padding: 8px 12px;
+        font-size: 1rem;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        width: 50%;
+        transition: border 0.2s;
+      }
       .start-chat {
         display: block;
         margin: 20px 0;
@@ -162,6 +181,10 @@
           <label for="username">이름:</label>
           <input type="text" id="username" placeholder="이름을 입력하세요" />
         </div>
+        <div class="usergender-area">
+          <label for="usergender">성별:</label>
+          <input type="text" id="usergender" placeholder="성별을 입력하세요" />
+        </div>  
 
         <a href="#" class="start-chat" id="start-chat-btn">채팅 시작하기</a>
       </div>
@@ -170,11 +193,13 @@
     <script>
       const startChatBtn = document.getElementById("start-chat-btn");
       const usernameInput = document.getElementById("username");
+      const usergenderInput = document.getElementById("usergender");
 
       startChatBtn.addEventListener("click", function (event) {
         event.preventDefault();
         const username = usernameInput.value.trim() || "사용자";
-        window.location.href = `/chat?username=${encodeURIComponent(username)}`;
+        const usergender = usergenderInput.value.trim() || "미정";
+        window.location.href = `/chat?username=${encodeURIComponent(username)}&usergender=${encodeURIComponent(usergender)}`;
       });
 
       usernameInput.addEventListener("keypress", function (event) {

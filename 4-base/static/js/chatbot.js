@@ -3,6 +3,7 @@ console.log("챗봇 JS 로드 완료");
 // DOM 요소
 const chatArea = document.querySelector(".chat-area");
 const username = chatArea ? chatArea.dataset.username : "사용자";
+const usergender = chatArea ? chatArea.dataset.usergender || "미정" : "미정";
 const chatLog = document.getElementById("chat-log");
 const userMessageInput = document.getElementById("user-message");
 const sendBtn = document.getElementById("send-btn");
@@ -33,6 +34,7 @@ async function sendMessage(isInitial = false) {
       body: JSON.stringify({
         message: message,
         username: username,
+        usergender: usergender,
       }),
     });
 

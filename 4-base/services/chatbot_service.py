@@ -355,7 +355,7 @@ class ChatbotService:
             return None, None, None
     
     
-    def _build_prompt(self, user_message: str, context: str = None, username: str = "사용자"):
+    def _build_prompt(self, user_message: str, context: str = None, username: str = "사용자", usergender: str = "미정") -> str:
         """
         LLM 프롬프트 구성
         
@@ -363,7 +363,7 @@ class ChatbotService:
             user_message (str): 사용자 메시지
             context (str): RAG 검색 결과 (선택)
             username (str): 사용자 이름
-        
+            usergender (str): 사용자 성별
         Returns:
             str: 최종 프롬프트
         
@@ -385,16 +385,48 @@ class ChatbotService:
         ```
         """
         system_prompt = self.config.get("system_prompt", {})
+        
+        # base가 리스트인 경우 처리
         base = system_prompt.get("base", "당신은 친절한 챗봇입니다.")
+        if isinstance(base, list):
+            base = "\n".join(base)
+        
+        # character 정보 가져오기
+        character = self.config.get("character", {})
+        background = character.get("background", [])
+        if isinstance(background, str):
+            background = [background]
+        background_text = "\n".join(background) if background else ""
+        
+        # rules 처리
         rules = system_prompt.get("rules", [])
         rules_text = "\n".join(f"- {rule}" for rule in rules)
 
         prompt_parts = [
             base,
+        ]
+
+        # 성별 인식할 수 있게
+        prompt_parts.extend([
+        "",
+        "[현재 대화 상대 정보]",
+        f"- 이름: {username}",
+        f"- 성별: {usergender}", 
+        ])
+        
+        # background이 있으면 추가
+        if background_text:
+            prompt_parts.extend([
+                "",
+                "[배경 정보]",
+                background_text,
+            ])
+        
+        prompt_parts.extend([
             "",
             "[응답 규칙]",
             rules_text if rules_text else "- 자연스럽고 도움이 되게 답하세요.",
-        ]
+        ])
 
         if context:
             prompt_parts.extend([
@@ -412,14 +444,14 @@ class ChatbotService:
         return "\n".join(prompt_parts)
     
     
-    def generate_response(self, user_message: str, username: str = "사용자") -> dict:
+    def generate_response(self, user_message: str, username: str = "사용자", usergender: str = "미정") -> dict:
         """
         사용자 메시지에 대한 챗봇 응답 생성
         
         Args:
             user_message (str): 사용자 입력
             username (str): 사용자 이름
-        
+            usergender (str): 사용자 성별
         Returns:
             dict: {
                 'reply': str,       # 챗봇 응답 텍스트
@@ -461,7 +493,7 @@ class ChatbotService:
             prompt = self._build_prompt(
                 user_message=user_message,
                 context=context,
-                username=username
+                username=username,
             )
         
         
@@ -546,17 +578,25 @@ class ChatbotService:
                 }
 
             if message.lower() == "init":
-                bot_name = self.config.get("name", "챗봇")
+                # bot_name = self.config.get("name", "챗봇")
+                # 맨 처음 시작할 때 멘트
                 return {
-                    "reply": f"안녕! 나는 {bot_name}이야. 무엇이든 편하게 물어봐.",
+                    "reply": f"{username}님, 정신이 드시나요? 소행성 지대를 지나던 중 충돌이 발생해 기체가 크게 흔들렸습니다. 다행히 제가 수동 제어로 전환해 위기를 넘겼어요. 우리는 지금 지구로 긴급 회항 중입니다.",
                     "image": None,
                 }
 
-            context, similarity, _metadata = self._search_similar(
-                query=message,
-                threshold=0.45,
-                top_k=5,
-            )
+            # RAG 검색
+            try:
+                context, similarity, _metadata = self._search_similar(
+                    query=message,
+                    threshold=0.45,
+                    top_k=5,
+                )
+            except Exception as e:
+                print(f"[ERROR] RAG 검색 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
+                context, similarity = None, None
 
             if self.client is None:
                 # API 키가 없는 개발 환경에서도 프론트 메시지 송수신은 확인할 수 있도록 폴백 응답 제공
@@ -568,25 +608,49 @@ class ChatbotService:
                     "image": None,
                 }
 
-            prompt = self._build_prompt(
-                user_message=message,
-                context=context,
-                username=username,
-            )
+            # 프롬프트 구성
+            try:
+                prompt = self._build_prompt(
+                    user_message=message,
+                    context=context,
+                    username=username,
+                    usergender=usergender
+                )
+            except Exception as e:
+                print(f"[ERROR] 프롬프트 구성 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "당신은 한국어로 답변하는 친절한 캐릭터 챗봇입니다.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-                max_tokens=500,
-            )
+            # LLM API 호출
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "당신은 한국어로 답변하는 친절한 캐릭터 챗봇입니다.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.7,
+                    max_tokens=500,
+                )
+            except Exception as e:
+                print(f"[ERROR] OpenAI API 호출 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
+            
+            # trigger keywords 정의
+            trigger_keywords = ["폐기", "자폭", "이탈", "명령", "삭제"]
+            is_triggered = any(keyword in message for keyword in trigger_keywords)
+
             reply = (response.choices[0].message.content or "").strip()
+
+            if is_triggered:
+                # 텍스트 중간중간 혹은 앞뒤에 노이즈 추가
+                reply = f"치...지직... {reply} ...칙... 오류... 감지...{usergender}"
 
             if not reply:
                 reply = "지금은 답변을 만들지 못했어. 다시 한 번 물어봐줘."
@@ -594,10 +658,13 @@ class ChatbotService:
             return {
                 "reply": reply,
                 "image": None,
+                # trigger keywords 감지되면 프론트엔드 이벤트(노이즈 효과) 추가
             }
             
         except Exception as e:
             print(f"[ERROR] 응답 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'reply': "죄송해요, 일시적인 오류가 발생했어요. 다시 시도해주세요.",
                 'image': None
