@@ -45,19 +45,23 @@ let timerStarted = false;
 let timerSeconds = 10 * 60;
 let openedArea = null;
 let messageIdCounter = 0;
+let responseVideoTimeout = null;
+
+let oxygenTimerStarted = false;
+let oxygenTimerId = null;
 
 const areaData = {
   living: {
     title: "LIVING AREA",
-    image: "/static/images/chatbot/living_area.png",
+    image: "/static/images/chatbot/LivingArea_with evidence.png",
   },
   cargo: {
     title: "CARGO BAY",
-    image: "/static/images/chatbot/cargo_bay.png",
+    image: "/static/images/chatbot/Cargohold_with evidence.png",
   },
   cockpit: {
     title: "COCKPIT",
-    image: "/static/images/chatbot/cockpit.png",
+    image: "/static/images/chatbot/Cockpit.png",
   },
 };
 
@@ -77,6 +81,26 @@ const hintsByStage = {
     "너 지구로 가려는 목적이 뭐야?",
     "궤도 좌표를 다시 보여줘.",
   ],
+};
+
+const chatBgVideo = document.getElementById("chat-bg-video");
+
+const stageVideos = {
+  1: {
+    idle: "/static/videos/chatbot/AI_P1_Wait.mp4",
+    responding: "/static/videos/chatbot/AI_P1_Loop.mp4",
+    speed: 2.0,
+  },
+  2: {
+    idle: "/static/videos/chatbot/AI_P1_Wait.mp4",
+    responding: "/static/videos/chatbot/AI_P2_Loop.mp4",
+    speed: 2.5,
+  },
+  3: {
+    idle: "/static/videos/chatbot/AI_P1_Wait.mp4",
+    responding: "/static/videos/chatbot/AI_P3_Loop.mp4",
+    speed: 2.5,
+  },
 };
 
 // ================================
@@ -159,6 +183,7 @@ function unlockStage(stage) {
   }
 
   updateHints();
+  setChatBackgroundVideo("idle");
 }
 
 function reduceAirLevel(amount = 1) {
@@ -174,6 +199,22 @@ function reduceAirLevel(amount = 1) {
   if (airLevel <= 5) {
     appendMessage("system", "SYSTEM: CRITICAL OXYGEN WARNING");
   }
+}
+
+function startOxygenTimer() {
+  if (oxygenTimerStarted) return;
+
+  oxygenTimerStarted = true;
+
+  oxygenTimerId = setInterval(() => {
+    reduceAirLevel(1);
+
+    if (airLevel <= 0) {
+      clearInterval(oxygenTimerId);
+      oxygenTimerId = null;
+      appendMessage("system", "SYSTEM: OXYGEN DEPLETED");
+    }
+  }, 60000); //Oxygen drop speed, currently at drop 1%p every 1 min
 }
 
 function startTimer() {
@@ -247,6 +288,26 @@ function checkStageTriggers(message) {
   }
 }
 
+function setChatBackgroundVideo(mode = "idle") {
+  if (!chatBgVideo) return;
+
+  const videoInfo = stageVideos[currentStage] || stageVideos[1];
+  const nextSrc = videoInfo[mode] || videoInfo.idle;
+
+  if (chatBgVideo.src.endsWith(nextSrc)) {
+    return;
+  }
+
+  chatBgVideo.src = nextSrc;
+  chatBgVideo.loop = true;
+  chatBgVideo.muted = true;
+  chatBgVideo.playbackRate = videoInfo.speed || 1.0;
+
+  chatBgVideo.play().catch((err) => {
+    console.warn("Background video play failed:", err);
+  });
+}
+
 // ================================
 // MESSAGE SEND FUNCTION
 // ================================
@@ -271,11 +332,17 @@ async function sendMessage(isInitial = false) {
       openedArea = null;
     }
 
-    reduceAirLevel(1);
+    // reduceAirLevel(1);    //use when wish to drop oxygen level when message is passed
     checkStageTriggers(message);
   }
 
+  if (responseVideoTimeout) {
+    clearTimeout(responseVideoTimeout);
+    responseVideoTimeout = null;
+  }
+
   const loadingId = appendMessage("bot", "생각 중...");
+  setChatBackgroundVideo("responding");
 
   try {
     const response = await fetch("/api/chat", {
@@ -310,6 +377,10 @@ async function sendMessage(isInitial = false) {
     }
 
     appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+    responseVideoTimeout = setTimeout(() => {
+      setChatBackgroundVideo("idle");
+      responseVideoTimeout = null;
+    }, 3500);
   } catch (err) {
     console.error("메시지 전송 에러:", err);
 
@@ -319,6 +390,7 @@ async function sendMessage(isInitial = false) {
       "system",
       "SYSTEM ERROR: HS-400 응답 모듈과 연결할 수 없습니다."
     );
+    setChatBackgroundVideo("idle");
   }
 }
 
@@ -418,6 +490,7 @@ window.addEventListener("load", () => {
   }
 
   updateHints();
+  startOxygenTimer(); //start dropping oxygen from beggining of game, comment out when unneeded
 
   setTimeout(() => {
     if (chatLog && chatLog.childElementCount === 0) {
