@@ -120,6 +120,8 @@ def api_chat():
         user_message = data.get('message', '')
         username = data.get('username', '사용자')
         usergender = data.get('usergender', '미정')
+        airLevel = data.get('airLevel', 20)
+        stage = data.get('stage', 1)
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
@@ -128,7 +130,7 @@ def api_chat():
         
         # 응답 생성
         chatbot = get_chatbot_service()
-        response = chatbot.generate_response(user_message, username, usergender)
+        response = chatbot.generate_response(user_message, username, usergender, airLevel=airLevel, stage=stage)
         
         return jsonify(response)
         
