@@ -158,6 +158,42 @@ function removeMessage(messageId) {
   }
 }
 
+function appendEarthOrbitApprovalChoices() {
+  if (!chatLog) return;
+  if (document.getElementById("choice-earth-orbit-approve")) return;
+
+  appendMessage("system", "SYSTEM: 지구 궤도 진입을 승인하시겠습니까?");
+
+  const approveBtn = document.createElement("button");
+  approveBtn.id = "choice-earth-orbit-approve";
+  approveBtn.classList.add("choice-btn-green");
+  approveBtn.textContent = "승인";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.id = "choice-earth-orbit-cancel";
+  cancelBtn.classList.add("choice-btn-green");
+  cancelBtn.textContent = "취소";
+
+  const choiceRow = document.createElement("div");
+  choiceRow.id = "choice-earth-orbit-row";
+  choiceRow.classList.add("choice-row");
+
+  approveBtn.addEventListener("click", () => {
+    choiceRow.remove();
+    appendMessage("system", "SYSTEM: EARTH ORBIT ENTRY APPROVED // COLLISION COURSE LOCKED");
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    choiceRow.remove();
+    appendMessage("system", "SYSTEM: 승인이 취소되었습니다. 코드 입력이 필요합니다. AI가 지구 궤도에 진입하려고 한 목적을 입력하세요.");
+  });
+
+  choiceRow.appendChild(approveBtn);
+  choiceRow.appendChild(cancelBtn);
+  chatLog.appendChild(choiceRow);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
 // ================================
 // GAME UI FUNCTIONS
 // ================================
@@ -263,7 +299,7 @@ function startOxygenTimer() {
       oxygenTimerId = null;
       appendMessage("system", "SYSTEM: OXYGEN DEPLETED");
     }
-  }, 60000); //Oxygen drop speed, currently at drop 1%p every 1 min
+  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min
 }
 
 function startTimer() {
@@ -299,13 +335,11 @@ function toggleArea(areaKey) {
   const hotspotCargoHandwriting = document.getElementById("hotspot-cargo-handwriting");
   const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
   const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
-  const hotspotCockpitOrderMessage = document.getElementById("hotspot-cockpit-order-message");
-  const hotspotCockpitOutsideCamera = document.getElementById("hotspot-cockpit-outside-camera");
+  const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
   const cockpitHotspots = [
     hotspotCockpitMainInterface,
     hotspotCockpitSubInterface,
-    hotspotCockpitOrderMessage,
-    hotspotCockpitOutsideCamera,
+    hotspotCockpitCamera,
   ];
 
   if (openedArea === areaKey) {
@@ -480,8 +514,7 @@ async function sendMessage(isInitial = false) {
       if (document.getElementById("hotspot-cargo-handwriting")) document.getElementById("hotspot-cargo-handwriting").style.display = "none";
       if (document.getElementById("hotspot-cockpit-main-interface")) document.getElementById("hotspot-cockpit-main-interface").style.display = "none";
       if (document.getElementById("hotspot-cockpit-sub-interface")) document.getElementById("hotspot-cockpit-sub-interface").style.display = "none";
-      if (document.getElementById("hotspot-cockpit-order-message")) document.getElementById("hotspot-cockpit-order-message").style.display = "none";
-      if (document.getElementById("hotspot-cockpit-outside-camera")) document.getElementById("hotspot-cockpit-outside-camera").style.display = "none";
+      if (document.getElementById("hotspot-cockpit-camera")) document.getElementById("hotspot-cockpit-camera").style.display = "none";
     }
 
     // reduceAirLevel(1);    //use when wish to drop oxygen level when message is passed
@@ -527,10 +560,24 @@ async function sendMessage(isInitial = false) {
       imagePath = data.reply.image || null;
     } else {
       replyText = data.reply;
-      imagePath = null;
+      imagePath = data.image || null;
     }
 
     appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+
+    const shouldAskEarthOrbitApproval =
+      currentStage >= 3 &&
+      replyText &&
+      (
+        replyText.includes("지구와 충돌해서 인류에게 고통") ||
+        replyText.includes("지구를 멸망시키는 것") ||
+        replyText.includes("지구로 가고 있습니다")
+      );
+
+    if (shouldAskEarthOrbitApproval) {
+      setTimeout(appendEarthOrbitApprovalChoices, 500);
+    }
+
     responseVideoTimeout = setTimeout(() => {
       setChatBackgroundVideo("idle");
       responseVideoTimeout = null;
@@ -789,21 +836,10 @@ window.addEventListener("load", () => {
     });
   }
 
-  const hotspotCockpitOrderMessage = document.getElementById("hotspot-cockpit-order-message");
-  if (hotspotCockpitOrderMessage) {
-    hotspotCockpitOrderMessage.addEventListener("click", () => {
-      showClueModal("COCKPIT ORDER MESSAGE", "");
-      const imgEl = document.getElementById("clueModalImage");
-      if (imgEl) {
-        imgEl.style.display = "none";
-      }
-    });
-  }
-
-  const hotspotCockpitOutsideCamera = document.getElementById("hotspot-cockpit-outside-camera");
-  if (hotspotCockpitOutsideCamera) {
-    hotspotCockpitOutsideCamera.addEventListener("click", () => {
-      showClueModal("COCKPIT OUTSIDE CAMERA", "");
+  const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
+  if (hotspotCockpitCamera) {
+    hotspotCockpitCamera.addEventListener("click", () => {
+      showClueModal("COCKPIT CAMERA", "");
       const imgEl = document.getElementById("clueModalImage");
       if (imgEl) {
         imgEl.style.display = "none";
