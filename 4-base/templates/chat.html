@@ -549,6 +549,83 @@
         inset 0 0 18px rgba(0, 229, 255, 0.32);
     }
 
+    .clue-modal-content {
+      width: 96vw;
+      max-width: none;
+      margin: 2vh auto;
+      padding: 16px;
+      background: rgba(1, 4, 10, 0.96);
+      border: 1px solid rgba(0, 229, 255, 0.36);
+      color: #dffcff;
+      text-align: center;
+    }
+
+    .clue-modal-close {
+      color: #8ff6ff;
+    }
+
+    .clue-modal-title {
+      font-family: "Orbitron", sans-serif;
+      color: #8ff6ff;
+      margin: 0 40px 12px;
+    }
+
+    .clue-modal-image-wrap {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+      height: 84vh;
+    }
+
+    #clueModalImage {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+      border: 1px solid rgba(105, 210, 255, 0.9);
+    }
+
+    #oxygen-overlay {
+      display: none;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+
+      color: #ffb23f;
+      font-family: "Orbitron", monospace;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+
+      text-shadow:
+        0 0 4px rgba(255, 178, 63, 0.95),
+        0 0 10px rgba(255, 130, 20, 0.9),
+        0 0 18px rgba(255, 90, 0, 0.65);
+
+      animation: oxygenLedFlicker 1.15s infinite;
+    }
+
+    @keyframes oxygenLedFlicker {
+      0%, 18%, 22%, 25%, 53%, 57%, 100% {
+        opacity: 1;
+        filter: brightness(1.2);
+      }
+
+      20%, 24%, 55% {
+        opacity: 0.45;
+        filter: brightness(0.75);
+      }
+
+      72% {
+        opacity: 0.85;
+        filter: brightness(1);
+      }
+    }
+
     @keyframes fadeIn {
       from {
         opacity: 0;
@@ -734,14 +811,24 @@
   </div>
 
   <!-- Clue Modal -->
+  <!-- Clue Modal -->
   <div class="modal" id="clueModal">
-    <div class="modal-content"
-      style="width: 96vw; max-width: none; margin: 2vh auto; padding: 16px; background: rgba(1, 4, 10, 0.96); border: 1px solid rgba(0, 229, 255, 0.36); color: #dffcff; text-align: center;">
-      <button class="modal-close" data-close-modal="clueModal" style="color: #8ff6ff;">&times;</button>
-      <h2 id="clueModalTitle" style="font-family: 'Orbitron', sans-serif; color: #8ff6ff; margin: 0 40px 12px;">CLUE DETAIL
+    <div class="modal-content clue-modal-content">
+      <button class="modal-close clue-modal-close" data-close-modal="clueModal">
+        &times;
+      </button>
+
+      <h2 id="clueModalTitle" class="clue-modal-title">
+        CLUE DETAIL
       </h2>
-      <img id="clueModalImage" src="" alt="Clue Detail"
-        style="display: block; width: 100%; height: 84vh; object-fit: contain; border-radius: 8px; border: 1px solid rgba(105, 210, 255, 0.9);" />
+
+      <div id="clueModalImageWrap" class="clue-modal-image-wrap">
+        <img id="clueModalImage" src="" alt="Clue Detail" />
+
+        <div id="oxygen-overlay">
+          20%
+        </div>
+      </div>
     </div>
   </div>
 
