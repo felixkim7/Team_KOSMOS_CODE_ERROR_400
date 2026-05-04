@@ -63,6 +63,11 @@ let hasEnteredLivingArea = false;
 let hasEnteredCargoBay = false;
 let hasEnteredCockpit = false;
 const recordedClues = new Set();
+const requiredPhase3Clues = [
+  "cockpitMainInterface",
+  "cockpitSubInterface",
+  "cockpitCamera",
+];
 
 const clueMemoEntries = {
   food: "보급 식량 상자에 식량이 2개 밖에 없다.",
@@ -86,6 +91,11 @@ function addClueMemo(clueId) {
   userMemo.value = `${userMemo.value}${prefix} ${entry}`;
   userMemo.scrollTop = userMemo.scrollHeight;
   recordedClues.add(clueId);
+  updateHints();
+}
+
+function hasFoundAllPhase3Clues() {
+  return requiredPhase3Clues.every((clueId) => recordedClues.has(clueId));
 }
 
 function getVisitedAreas() {
@@ -399,6 +409,10 @@ function updateHints() {
 
   }
    
+  else if (currentStage === 3 && !hasFoundAllPhase3Clues()) {
+    hints = [];
+  }
+
   else {
     hints = hintsByStage[currentStage] || hintsByStage[1];
   }
