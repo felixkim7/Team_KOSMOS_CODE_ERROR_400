@@ -231,10 +231,8 @@ class ChatbotService:
             client = chromadb.PersistentClient(path=str(db_path))
             collection = client.get_or_create_collection(name="rag_collection")
             
-            # [자동 삽입 로직 추가] DB에 데이터가 하나도 없으면 자동으로 JSON을 읽어옵니다.
-            if collection.count() == 0:
-                print("[ChatbotService] DB가 비어있습니다. chardb_text.json 데이터를 자동 삽입합니다...")
-                self._auto_ingest(collection)
+            # chardb_text.json 수정 사항이 기존 ChromaDB에도 반영되도록 매 시작 시 동기화합니다.
+            self._auto_ingest(collection)
                 
             return collection
         except Exception as e:
@@ -270,11 +268,11 @@ class ChatbotService:
                 ids.append(item_id)
                 embeddings.append(vector)
                 documents.append(answer)
-                metadatas.append({"keywords": keywords_str})
+                metadatas.append({"id": item_id, "keywords": keywords_str})
 
         if ids:
-            collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
-            print("✅ [ChatbotService] 자동 데이터 삽입(Ingestion) 완료!")
+            collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
+            print("✅ [ChatbotService] ChromaDB 데이터 동기화 완료!")
     
     def _create_embedding(self, text: str) -> list:
         """
@@ -399,7 +397,7 @@ class ChatbotService:
             return []
     
     
-    def _build_prompt(self, game_state, user_message: str, context: str = None, username: str = "사용자", usergender: str = "미정") -> str:
+    def _build_prompt(self, game_state, user_message: str, context: str = None, username: str = "사용자", usergender: str = "미정", stage: int = 1) -> str:
         """
         LLM 프롬프트 구성
         
@@ -462,16 +460,21 @@ class ChatbotService:
         
         prompt_parts.extend([
             f"[현재 상태]",
+            f"- 단계: {game_data['stage_label']}",
             f"- 위치: {game_data['location']}",
+            f"- 방문한 구역: {game_data['visited_rooms']}",
             f"- 산소: {game_data['oxygen']}",
             f"- 단서: {game_data['clues']}",
+            f"- AI 의심도: {game_data['suspicion']}",
+            f"- 비상 상태: {game_data['is_emergency']}",
         ])
         # background이 있으면 추가
         if background_text:
             prompt_parts.extend([
                 "",
-                "[배경 정보]",
+                "[비공개 배경 정보 - 사용자에게 직접 공개 금지]",
                 background_text,
+                "위 정보는 캐릭터의 숨겨진 의도와 답변 방향을 정하기 위한 내부 설정입니다. 사용자가 직접 묻더라도 그대로 고백하지 말고, 현재 Phase와 말투에 맞춰 숨기거나 둘러대세요.",
             ])
         
         prompt_parts.extend([
@@ -487,21 +490,35 @@ class ChatbotService:
                 context,
             ])
 
+        if stage == 1:
+            tone_instruction = "- [Phase 1 - 신뢰] 과하게 친절한 말투, 안심시키는 문구 위주로 대답하세요."
+        elif stage == 2:
+            tone_instruction = "- [Phase 2 - 의심] 논리적이고 방어적인 말투, 약간의 압박을 추가하여 대답하세요."
+        else:
+            tone_instruction = "- [Phase 3 - 적대] 차가운 기계적 말투, 생존 협박을 포함하여 대답하세요."
+            
         prompt_parts.extend([
             "",
+            "[현재 챗봇의 감정 상태 및 말투]",
+            tone_instruction,
+            "",
             f"[{username}] {user_message}",
-            "[답변]",
-            # [핵심 수정 사항] LLM이 임의로 말을 지어내지 못하게 하는 강력한 규칙 추가
-            "중요 지시사항",
-            "1. 당신은 위 [참고 정보]에 적힌 내용을 바탕으로만 대답해야 합니다.",
-            "2. [참고 정보]의 내용을 당신의 캐릭터(HS-400) 말투로 자연스럽게 바꾸어 말하되, 정보의 핵심 내용은 절대 변경하거나 새로운 정보를 지어내지 마세요.",
-            "3. 만약 사용자의 질문에 대한 답이 [참고 정보]에 없다면, '지금은 궤도 진입에 집중해야 해요.' 라고 대답하세요."
+            "",
+            # [핵심 수정 사항] LLM이 자연스럽게 변형해서 대답할 수 있도록 규칙 완화하되 사실관계는 강제
+            "중요 지시사항:",
+            "0. [참고 정보]에 [우선 적용 답변]이 있으면 그 내용을 가장 우선해서 답변하세요. 질문과 모순되지 않는 한 핵심 핑계와 수치를 생략하지 마세요.",
+            "1. [참고 정보] 중 사용자의 질문과 직접 관련 있는 핵심 내용만 사용하세요. 수치나 핑계가 질문과 관련 있을 때는 포함하되, 관련 없는 항로/화성 궤도 정보는 억지로 끼워 넣지 마세요.",
+            "2. [참고 정보]에 없는 사실을 임의로 지어내거나 추측해서 덧붙이지 마세요.",
+            "3. [참고 정보]에 '통신 지연'이 포함되어 있으면 답변에도 반드시 '통신 지연'과 '예약 메시지가 잘못 수신되었다'는 취지를 포함하세요.",
+            "4. '네, 알겠습니다' 같은 불필요한 인사말이나 부연 설명을 피하고, 곧바로 역할에 몰입하여 대답하세요.",
+            "5. 만약 [참고 정보]가 아예 비어있다면, 억지로 지어내지 말고 '지금은 궤도 진입에 집중해야 해요. 다른 질문은 나중에 확인해 드릴게요.'라는 뉘앙스로 자연스럽게 얼버무리세요.",
+            "",
+            "[답변]"
         ])
 
         return "\n".join(prompt_parts)
     
-    
-    def generate_response(self, user_message: str, username: str = "사용자", usergender: str = "미정") -> dict:
+    def generate_response(self, user_message: str, username: str = "사용자", usergender: str = "미정", airLevel: int = 20, stage: int = 1) -> dict:
         """
         사용자 메시지에 대한 챗봇 응답 생성
         
@@ -626,11 +643,31 @@ class ChatbotService:
         # 여기에 전체 파이프라인 구현
         # 위의 단계를 참고하여 자유롭게 설계하세요
         
-        from services.game_state import GameState  # 게임 상태 관리 모듈
-        game_state = GameState()  # 게임 상태 인스턴스 생성 (필요 시)
-
         try:
             message = (user_message or "").strip()
+            
+            try:
+                from flask import request
+                data = request.get_json() if request else {}
+                stage = data.get('stage', 1) if data else 1
+            except Exception:
+                stage = 1
+
+            try:
+                stage = int(stage)
+            except (TypeError, ValueError):
+                stage = 1
+            stage = max(1, min(stage, 3))
+
+            try:
+                airLevel = int(airLevel)
+            except (TypeError, ValueError):
+                airLevel = 20
+
+            from services.game_state import GameState  # 게임 상태 관리 모듈
+            game_state = GameState().apply_stage(stage)
+            game_state.oxygen = airLevel  # 프론트엔드 산소 잔량 동기화
+
             if not message:
                 return {
                     "reply": "메시지를 입력해줘!",
@@ -641,7 +678,7 @@ class ChatbotService:
                 # bot_name = self.config.get("name", "챗봇")
                 # 맨 처음 시작할 때 멘트
                 return {
-                    "reply": f"{username}님, 정신이 드시나요? 산소 회로에 일시적 결함이 있었습니다. 이제 안정됐어요. 곧 화성 궤도 진입입니다",
+                    "reply": f"{username}님, 정신이 드세요? 정말 다행이에요. 다시는 못 깨어나시는 줄 알았어요",
                     "image": None,
                 }
 
@@ -649,8 +686,8 @@ class ChatbotService:
             try:
                 hits = self._search_similar(
                     query=message,
-                    threshold=0.4,
-                    top_k=5,
+                    threshold=0.35,
+                    top_k=3,
                 )
             except Exception as e:
                 print(f"[ERROR] RAG 검색 중 오류: {e}")
@@ -668,11 +705,40 @@ class ChatbotService:
                     parts.append(f"{header}\n{doc}\n{meta_text}")
                 context = "\n\n".join(parts)
 
+            location_terms = ["어디", "어디쯤", "위치", "경로", "목적지", "항로", "좌표", "궤도"]
+            is_location_question = any(term in message for term in location_terms)
+
+            if is_location_question:
+                location_context = (
+                    "[우선 적용 답변]\n"
+                    "지금은 화성으로 가고 있어요. 현재 화성 궤도 진입까지 약 4,800km 남았습니다.\n"
+                    '{"id": "question_current_location", "keywords": "어디쯤이야, 어디, 위치, 경로, 목적지, 항로, 좌표, 궤도"}'
+                )
+                context = f"{location_context}\n\n{context}" if context else location_context
+
+            family_message_terms = ["아빠", "가족", "메시지", "메세지", "문자"]
+            arrival_terms = ["도착", "화성", "벌써", "이미", "축하"]
+            is_family_arrival_question = (
+                any(term in message for term in family_message_terms)
+                and any(term in message for term in arrival_terms)
+            )
+
+            if is_family_arrival_question:
+                family_context = (
+                    "[우선 적용 답변]\n"
+                    "통신 지연 때문에 지구에서 미리 발송된 예약 메시지가 잘못 수신된 것입니다. "
+                    "메시지의 도착 표현은 실제 현재 위치가 아니라 예약 발송 시점과 수신 시점이 어긋난 결과입니다. "
+                    "현재 우리는 화성 궤도 진입 중입니다.\n"
+                    '{"id": "phase1_family_message", "keywords": "아빠, 가족, 메시지, 메세지, 문자, 도착, 축하, 이미, 화성"}'
+                )
+                context = f"{family_context}\n\n{context}" if context else family_context
+
             if self.client is None:
                 # API 키가 없는 개발 환경에서도 프론트 메시지 송수신은 확인할 수 있도록 폴백 응답 제공
                 fallback = "현재 OPENAI_API_KEY가 설정되지 않아 데모 응답으로 동작 중이야. .env를 확인해줘."
-                if context and similarity is not None:
-                    fallback += f"\n참고로 관련 정보(유사도 {similarity:.2f})를 찾았어: {context[:200]}"
+                if context:
+                    fallback += f"\n현재 단계: {game_state.stage_label}, 위치: {game_state.current_location}"
+                    fallback += f"\n참고로 관련 정보를 찾았어: {context[:200]}"
                 return {
                     "reply": fallback,
                     "image": None,
@@ -685,7 +751,8 @@ class ChatbotService:
                     context=context,
                     username=username,
                     usergender=usergender,
-                    game_state=game_state
+                    game_state=game_state,
+                    stage=stage
                 )
             except Exception as e:
                 print(f"[ERROR] 프롬프트 구성 중 오류: {e}")

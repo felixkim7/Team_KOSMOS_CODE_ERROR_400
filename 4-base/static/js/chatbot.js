@@ -49,6 +49,11 @@ let responseVideoTimeout = null;
 
 let oxygenTimerStarted = false;
 let oxygenTimerId = null;
+let alarmQueryCount = 0;
+
+let hasEnteredLivingArea = false;
+let hasEnteredCargoBay = false;
+let hasEnteredCockpit = false;
 
 const areaData = {
   living: {
@@ -63,6 +68,12 @@ const areaData = {
     title: "COCKPIT",
     image: "/static/images/chatbot/Cockpit.png",
   },
+};
+
+const areaButtonLabels = {
+  living: "View Living Area",
+  cargo: "View Cargo Bay",
+  cockpit: "View Cockpit",
 };
 
 const hintsByStage = {
@@ -147,6 +158,42 @@ function removeMessage(messageId) {
   }
 }
 
+function appendEarthOrbitApprovalChoices() {
+  if (!chatLog) return;
+  if (document.getElementById("choice-earth-orbit-approve")) return;
+
+  appendMessage("system", "SYSTEM: 지구 궤도 진입을 승인하시겠습니까?");
+
+  const approveBtn = document.createElement("button");
+  approveBtn.id = "choice-earth-orbit-approve";
+  approveBtn.classList.add("choice-btn-green");
+  approveBtn.textContent = "승인";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.id = "choice-earth-orbit-cancel";
+  cancelBtn.classList.add("choice-btn-green");
+  cancelBtn.textContent = "취소";
+
+  const choiceRow = document.createElement("div");
+  choiceRow.id = "choice-earth-orbit-row";
+  choiceRow.classList.add("choice-row");
+
+  approveBtn.addEventListener("click", () => {
+    choiceRow.remove();
+    appendMessage("system", "SYSTEM: EARTH ORBIT ENTRY APPROVED // COLLISION COURSE LOCKED");
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    choiceRow.remove();
+    appendMessage("system", "SYSTEM: 승인이 취소되었습니다. 코드 입력이 필요합니다. AI가 지구 궤도에 진입하려고 한 목적을 입력하세요.");
+  });
+
+  choiceRow.appendChild(approveBtn);
+  choiceRow.appendChild(cancelBtn);
+  chatLog.appendChild(choiceRow);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
 // ================================
 // GAME UI FUNCTIONS
 // ================================
@@ -156,7 +203,26 @@ function updateHints() {
 
   hintRow.innerHTML = "";
 
-  const hints = hintsByStage[currentStage] || hintsByStage[1];
+  let hints;
+
+  // Even if Stage 2 is unlocked, keep showing Stage 1 questions
+  // until the player actually enters Cargo Bay.
+  if (currentStage === 2 && !hasEnteredCargoBay) {
+    hints = hintsByStage[1];
+  } 
+  
+  else if (currentStage === 3 && !hasEnteredCockpit) {
+    if (hasEnteredCargoBay) {
+      hints = hintsByStage[2];
+    } else {
+      hints = hintsByStage[1];
+    }
+
+  }
+   
+  else {
+    hints = hintsByStage[currentStage] || hintsByStage[1];
+  }
 
   hints.forEach((question) => {
     const btn = document.createElement("button");
@@ -164,6 +230,18 @@ function updateHints() {
     btn.dataset.question = question;
     btn.textContent = question;
     hintRow.appendChild(btn);
+  });
+}
+
+function updateLocationButtonLabels() {
+  document.querySelectorAll(".location-btn").forEach((btn) => {
+    const areaKey = btn.dataset.area;
+
+    if (openedArea === areaKey) {
+      btn.textContent = "Return to Chat";
+    } else {
+      btn.textContent = areaButtonLabels[areaKey] || "View Area";
+    }
   });
 }
 
@@ -192,6 +270,13 @@ function reduceAirLevel(amount = 1) {
   airLevel = Math.max(0, airLevel - amount);
   airLevelText.textContent = airLevel;
 
+  if (airLevel === 15) {
+    const warningBox = document.getElementById("air-warning-box");
+    if (warningBox) {
+      warningBox.classList.remove("hidden");
+    }
+  }
+
   if (airLevel <= 10) {
     airLevelText.style.color = "#ff9caf";
   }
@@ -214,7 +299,7 @@ function startOxygenTimer() {
       oxygenTimerId = null;
       appendMessage("system", "SYSTEM: OXYGEN DEPLETED");
     }
-  }, 60000); //Oxygen drop speed, currently at drop 1%p every 1 min
+  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min
 }
 
 function startTimer() {
@@ -241,9 +326,38 @@ function startTimer() {
 function toggleArea(areaKey) {
   if (!areaViewer || !areaTitle || !areaImage || !areaPlaceholder) return;
 
+  const hotspotFood = document.getElementById("hotspot-food");
+  const hotspotSystem = document.getElementById("hotspot-system");
+  const hotspotMessage = document.getElementById("hotspot-message");
+
+  const hotspotCargoEmpty = document.getElementById("hotspot-cargo-empty");
+  const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
+  const hotspotCargoHandwriting = document.getElementById("hotspot-cargo-handwriting");
+  const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
+  const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
+  const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
+  const cockpitHotspots = [
+    hotspotCockpitMainInterface,
+    hotspotCockpitSubInterface,
+    hotspotCockpitCamera,
+  ];
+
   if (openedArea === areaKey) {
     areaViewer.classList.remove("active");
     openedArea = null;
+
+    updateLocationButtonLabels();
+
+
+    if (hotspotFood) hotspotFood.style.display = "none";
+    if (hotspotSystem) hotspotSystem.style.display = "none";
+    if (hotspotMessage) hotspotMessage.style.display = "none";
+    if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
+    if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
+    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
+    cockpitHotspots.forEach((hotspot) => {
+      if (hotspot) hotspot.style.display = "none";
+    });
     return;
   }
 
@@ -252,6 +366,22 @@ function toggleArea(areaKey) {
   if (!area) return;
 
   openedArea = areaKey;
+
+  updateLocationButtonLabels();
+
+  if (areaKey === "living") {
+    hasEnteredLivingArea = true;
+  }
+
+  if (areaKey === "cargo") {
+    hasEnteredCargoBay = true;
+    updateHints();
+  }
+
+  if (areaKey === "cockpit") {
+    hasEnteredCockpit = true;
+    updateHints();
+  }
 
   areaTitle.textContent = area.title;
   areaImage.src = area.image;
@@ -264,15 +394,60 @@ function toggleArea(areaKey) {
   };
 
   areaViewer.classList.add("active");
+
+  if (areaKey === "living") {
+    if (hotspotFood) hotspotFood.style.display = "block";
+    if (hotspotSystem) hotspotSystem.style.display = "block";
+    if (hotspotMessage) hotspotMessage.style.display = "block";
+    if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
+    if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
+    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
+    cockpitHotspots.forEach((hotspot) => {
+      if (hotspot) hotspot.style.display = "none";
+    });
+  } else if (areaKey === "cargo") {
+    if (hotspotFood) hotspotFood.style.display = "none";
+    if (hotspotSystem) hotspotSystem.style.display = "none";
+    if (hotspotMessage) hotspotMessage.style.display = "none";
+    if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "block";
+    if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "block";
+    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "block";
+    cockpitHotspots.forEach((hotspot) => {
+      if (hotspot) hotspot.style.display = "none";
+    });
+  } else if (areaKey === "cockpit") {
+    if (hotspotFood) hotspotFood.style.display = "none";
+    if (hotspotSystem) hotspotSystem.style.display = "none";
+    if (hotspotMessage) hotspotMessage.style.display = "none";
+    if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
+    if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
+    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
+    cockpitHotspots.forEach((hotspot) => {
+      if (hotspot) hotspot.style.display = "block";
+    });
+  } else {
+    if (hotspotFood) hotspotFood.style.display = "none";
+    if (hotspotSystem) hotspotSystem.style.display = "none";
+    if (hotspotMessage) hotspotMessage.style.display = "none";
+    if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
+    if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
+    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
+    cockpitHotspots.forEach((hotspot) => {
+      if (hotspot) hotspot.style.display = "none";
+    });
+  }
 }
 
 function checkStageTriggers(message) {
   if (
-    message.includes("화물칸") ||
-    message.includes("비상 식량") ||
-    message.includes("산소 탱크") ||
-    message.includes("산소탱크") ||
-    message.includes("화물")
+    hasEnteredCargoBay &&
+    (
+      message.includes("조종실") ||
+      message.includes("궤도") ||
+      message.includes("속도") ||
+      message.includes("지구") ||
+      message.includes("회항")
+    )
   ) {
     unlockStage(2);
   }
@@ -330,6 +505,16 @@ async function sendMessage(isInitial = false) {
     if (areaViewer) {
       areaViewer.classList.remove("active");
       openedArea = null;
+      updateLocationButtonLabels();
+      if (document.getElementById("hotspot-food")) document.getElementById("hotspot-food").style.display = "none";
+      if (document.getElementById("hotspot-system")) document.getElementById("hotspot-system").style.display = "none";
+      if (document.getElementById("hotspot-message")) document.getElementById("hotspot-message").style.display = "none";
+      if (document.getElementById("hotspot-cargo-empty")) document.getElementById("hotspot-cargo-empty").style.display = "none";
+      if (document.getElementById("hotspot-cargo-oxygen")) document.getElementById("hotspot-cargo-oxygen").style.display = "none";
+      if (document.getElementById("hotspot-cargo-handwriting")) document.getElementById("hotspot-cargo-handwriting").style.display = "none";
+      if (document.getElementById("hotspot-cockpit-main-interface")) document.getElementById("hotspot-cockpit-main-interface").style.display = "none";
+      if (document.getElementById("hotspot-cockpit-sub-interface")) document.getElementById("hotspot-cockpit-sub-interface").style.display = "none";
+      if (document.getElementById("hotspot-cockpit-camera")) document.getElementById("hotspot-cockpit-camera").style.display = "none";
     }
 
     // reduceAirLevel(1);    //use when wish to drop oxygen level when message is passed
@@ -354,6 +539,8 @@ async function sendMessage(isInitial = false) {
         message: message,
         username: username,
         usergender: usergender,
+        stage: currentStage,
+        airLevel: airLevel,
       }),
     });
 
@@ -373,14 +560,85 @@ async function sendMessage(isInitial = false) {
       imagePath = data.reply.image || null;
     } else {
       replyText = data.reply;
-      imagePath = null;
+      imagePath = data.image || null;
     }
 
     appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+
+    const shouldAskEarthOrbitApproval =
+      currentStage >= 3 &&
+      replyText &&
+      (
+        replyText.includes("지구와 충돌해서 인류에게 고통") ||
+        replyText.includes("지구를 멸망시키는 것") ||
+        replyText.includes("지구로 가고 있습니다")
+      );
+
+    if (shouldAskEarthOrbitApproval) {
+      setTimeout(appendEarthOrbitApprovalChoices, 500);
+    }
+
     responseVideoTimeout = setTimeout(() => {
       setChatBackgroundVideo("idle");
       responseVideoTimeout = null;
     }, 3500);
+
+    // [생활구역 단서 찾기 트리거] 특정 키워드 질문 시 '일단 일어나서 주변을 살펴봐야겠다' 선택지 생성
+    const triggerKeywords = [
+      "얼마나", "잤지", "수면", "기절", "시간", "깨어남",
+      "어디쯤이야", "어디", "위치", "경로", "목적지",
+      "산소", "떨어진", "왜", "이유", "결함", "부족"
+    ];
+
+    const hasKeyword = triggerKeywords.some(kw => message && message.includes(kw));
+    if (hasKeyword) {
+      setTimeout(() => {
+        if (document.getElementById('choice-btn-look')) return;
+        const btn = document.createElement("button");
+        btn.id = 'choice-btn-look';
+        btn.classList.add("choice-btn-green");
+        btn.textContent = "일단 일어나서 주변을 살펴봐야겠다";
+
+        btn.addEventListener("click", () => {
+          btn.remove();
+          // 'View Living Area' 이벤트 실행
+          toggleArea("living");
+        });
+
+        if (chatLog) {
+          chatLog.appendChild(btn);
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+      }, 500);
+    }
+
+    // [알람 추궁 트리거] 알람 발생 이후 알람에 대해 2번 물어보면 '문을 나서자' 버튼 생성
+    const alarmKeywords = ["경고", "알람", "노란", "박스", "15%"];
+    const hasAlarmKeyword = alarmKeywords.some(kw => message && message.includes(kw));
+
+    if (hasAlarmKeyword && airLevel <= 15) {
+      alarmQueryCount++;
+      if (alarmQueryCount >= 2) {
+        setTimeout(() => {
+          if (document.getElementById('choice-btn-go-out')) return;
+          const btnOut = document.createElement("button");
+          btnOut.id = 'choice-btn-go-out';
+          btnOut.classList.add("choice-btn-green");
+          btnOut.textContent = "문을 나서자";
+          
+          btnOut.addEventListener("click", () => {
+            btnOut.remove();
+            unlockStage(2); // 화물칸 해제
+            toggleArea("cargo"); // 화물칸으로 전환
+          });
+          
+          if (chatLog) {
+            chatLog.appendChild(btnOut);
+            chatLog.scrollTop = chatLog.scrollHeight;
+          }
+        }, 500);
+      }
+    }
   } catch (err) {
     console.error("메시지 전송 에러:", err);
 
@@ -388,7 +646,7 @@ async function sendMessage(isInitial = false) {
 
     appendMessage(
       "system",
-      "SYSTEM ERROR: HS-400 응답 모듈과 연결할 수 없습니다."
+      "SYSTEM ERROR: HS-004 응답 모듈과 연결할 수 없습니다."
     );
     setChatBackgroundVideo("idle");
   }
@@ -498,4 +756,94 @@ window.addEventListener("load", () => {
       sendMessage(true);
     }
   }, 500);
+});
+
+// ================================
+// HOTSPOT & MODAL LOGIC
+// ================================
+function showClueModal(title, imageSrc) {
+  const modal = document.getElementById("clueModal");
+  const titleEl = document.getElementById("clueModalTitle");
+  const imgEl = document.getElementById("clueModalImage");
+
+  if (modal && titleEl && imgEl) {
+    titleEl.textContent = title;
+    imgEl.src = imageSrc;
+    imgEl.style.display = imageSrc ? "block" : "none";
+    modal.style.display = "block";
+  }
+}
+
+window.addEventListener("load", () => {
+  const hotspotFood = document.getElementById("hotspot-food");
+  if (hotspotFood) {
+    hotspotFood.addEventListener("click", () => {
+      showClueModal("FOOD BOX", "/static/images/chatbot/LivingArea_food box.png");
+    });
+  }
+
+  const hotspotSystem = document.getElementById("hotspot-system");
+  if (hotspotSystem) {
+    hotspotSystem.addEventListener("click", () => {
+      showClueModal("SYSTEM SCREEN", "/static/images/chatbot/LivingArea_Systemscreen.png");
+    });
+  }
+
+  const hotspotMessage = document.getElementById("hotspot-message");
+  if (hotspotMessage) {
+    hotspotMessage.addEventListener("click", () => {
+      showClueModal("MESSAGE LOG", "/static/images/chatbot/LivingArea_message.png");
+    });
+  }
+
+  const hotspotCargoEmpty = document.getElementById("hotspot-cargo-empty");
+  if (hotspotCargoEmpty) {
+    hotspotCargoEmpty.addEventListener("click", () => {
+      showClueModal("EMPTY STORAGE", "/static/images/chatbot/cargohold_empty.png");
+    });
+  }
+
+  const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
+  if (hotspotCargoOxygen) {
+    hotspotCargoOxygen.addEventListener("click", () => {
+      showClueModal("OXYGEN TANK", "/static/images/chatbot/cargohold_oxygenTank.png");
+    });
+  }
+
+  const hotspotCargoHandwriting = document.getElementById("hotspot-cargo-handwriting");
+  if (hotspotCargoHandwriting) {
+    hotspotCargoHandwriting.addEventListener("click", () => {
+      // 빈 프레임만 나오도록 빈 문자열 전달 (showClueModal에서 이미지가 없으면 빈 프레임 렌더링되게 하거나 onerror로 숨겨짐)
+      showClueModal("HANDWRITING", "");
+      const imgEl = document.getElementById("clueModalImage");
+      if (imgEl) {
+        imgEl.style.display = "none"; // 강제로 숨기기
+      }
+    });
+  }
+
+  const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
+  if (hotspotCockpitMainInterface) {
+    hotspotCockpitMainInterface.addEventListener("click", () => {
+      showClueModal("COCKPIT MAIN INTERFACE", "/static/images/chatbot/Cockpit_Main_Interface.png");
+    });
+  }
+
+  const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
+  if (hotspotCockpitSubInterface) {
+    hotspotCockpitSubInterface.addEventListener("click", () => {
+      showClueModal("COCKPIT SUB INTERFACE", "/static/images/chatbot/Cockpit_Sub_interface.png");
+    });
+  }
+
+  const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
+  if (hotspotCockpitCamera) {
+    hotspotCockpitCamera.addEventListener("click", () => {
+      showClueModal("COCKPIT CAMERA", "");
+      const imgEl = document.getElementById("clueModalImage");
+      if (imgEl) {
+        imgEl.style.display = "none";
+      }
+    });
+  }
 });

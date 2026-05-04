@@ -13,6 +13,7 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=True
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-please-change}
+      - ANONYMIZED_TELEMETRY=False
     volumes:
       # 개발 시 코드 변경사항 실시간 반영
       - ./app.py:/app/app.py
@@ -20,8 +21,6 @@ services:
       - ./templates:/app/templates
       - ./static:/app/static
       - ./config:/app/config
-      # ChromaDB 데이터 영속성 보장
-      - chatbot-data:/app/static/data/chatbot
     restart: unless-stopped
     networks:
       - chatbot-network
@@ -37,10 +36,6 @@ services:
       timeout: 3s
       retries: 3
       start_period: 40s
-
-volumes:
-  chatbot-data:
-    driver: local
 
 networks:
   chatbot-network:
