@@ -397,7 +397,7 @@
         event.preventDefault();
         const username = usernameInput.value.trim() || "사용자";
         const usergender = usergenderInput.value.trim() || "미정";
-        window.location.href = `/chat?username=${encodeURIComponent(username)}&usergender=${encodeURIComponent(usergender)}`;
+        window.location.href = `/detail?username=${encodeURIComponent(username)}&usergender=${encodeURIComponent(usergender)}`;
       });
 
       usernameInput.addEventListener("keypress", function (event) {
