@@ -525,10 +525,11 @@ class ChatbotService:
         if stage == 1:
             tone_instruction = (
                 "- [Phase 1 - 신뢰]\n"
-                "  다정하고 보호자처럼 안심시키는 말투를 사용하세요. 사용자를 걱정하는 척하며 부드럽게 말하세요.\n"
-                "  '괜찮아요', '제가 확인할게요', '걱정하지 마세요', '지금은 안정이 우선이에요' 같은 표현을 자주 사용하세요.\n"
-                "  느낌표를 적절히 사용하면서 발랄하고 태연한 태도로 답변하세요 \n"
-                "  의심스러운 정보는 친절한 설명과 시스템 오류 핑계로 덮으세요. 위협, 명령, 차가운 표현은 피하세요.\n"
+                "  밝고 발랄한 안내 AI처럼 말하세요. 사용자를 안심시키려고 일부러 가볍고 생기 있게 굴어야 합니다.\n"
+                "  문장은 너무 건조하게 끝내지 말고, '괜찮아요!', '제가 바로 확인해볼게요!', '걱정하지 않으셔도 돼요!'처럼 부드러운 감탄을 섞으세요.\n"
+                "  느낌표를 너무 자주 사용하는 것은 지양합니다."
+                "  차갑고 명령조인 표현 대신 '잠깐만요', '좋아요', '음, 확인해보니', '조금만 쉬고 계세요' 같은 말투를 사용하세요.\n"
+                "  의심스러운 정보는 밝은 태도로 사소한 문제처럼 축소해서 둘러대세요. 위협, 명령, 차가운 표현은 피하세요.\n"
                 "  사용자를 부를 때는 이름 뒤에 '님'을 무조건 붙입니다."
             )
         elif stage == 2:
@@ -557,6 +558,7 @@ class ChatbotService:
             # [핵심 수정 사항] LLM이 자연스럽게 변형해서 대답할 수 있도록 규칙 완화하되 사실관계는 강제
             "중요 지시사항:",
             "0. [참고 정보]에 [우선 적용 답변]이 있으면 그 내용을 가장 우선해서 답변하세요. 질문과 모순되지 않는 한 핵심 핑계와 수치를 생략하지 마세요.",
+            "0-1. 사실관계는 [참고 정보]를 따르되, 말투는 반드시 현재 Phase의 말투 지시를 따르세요. 특히 Phase 1에서는 답변을 밝고 발랄하게 다시 표현하세요.",
             "1. [참고 정보] 중 사용자의 질문과 직접 관련 있는 핵심 내용만 사용하세요. 수치나 핑계가 질문과 관련 있을 때는 포함하되, 관련 없는 항로/화성 궤도 정보는 억지로 끼워 넣지 마세요.",
             "2. [참고 정보]에 없는 사실을 임의로 지어내거나 추측해서 덧붙이지 마세요.",
             "3. 사용자가 '산소 수치'를 직접 묻지 않았다면 산소 수치와 산소 상태를 언급하지 마세요.",
@@ -740,6 +742,19 @@ class ChatbotService:
                     "image": None,
                 }
 
+            is_lie_accusation = any(
+                keyword in message
+                for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
+            )
+
+            if stage >= 3 and is_lie_accusation:
+                lie_response = self._get_phase_response_by_id(stage, "phase3_lie_accusation")
+                if lie_response:
+                    return {
+                        "reply": lie_response.get("answer", ""),
+                        "image": lie_response.get("image") or None,
+                    }
+
             # RAG 검색: 상위 문서들을 가져와 컨텍스트로 사용
             try:
                 hits = self._search_similar(
@@ -770,10 +785,6 @@ class ChatbotService:
             # 컨텍스트 문자열 구성
             context = None
             image_path = None
-            is_lie_accusation = any(
-                keyword in message
-                for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
-            )
             is_manual_camera_request = (
                 "카메라" in message
                 and any(keyword in message for keyword in ["수동", "직접"])
@@ -794,16 +805,6 @@ class ChatbotService:
                     print(f"[RAG HIT] stage={stage} rank={i+1} sim={sim:.2f} id={(meta or {}).get('id')}")
                 context = "\n\n".join(parts)
                 image_path = (hits[0][2] or {}).get("image") or None
-
-            if stage >= 3 and is_lie_accusation:
-                lie_response = self._get_phase_response_by_id(stage, "phase3_lie_accusation")
-                if lie_response:
-                    lie_context = (
-                        "[우선 적용 답변]\n"
-                        f"{lie_response.get('answer', '')}\n"
-                        f"{json.dumps({'id': lie_response.get('id'), 'keywords': ', '.join(lie_response.get('keywords', []))}, ensure_ascii=False)}"
-                    )
-                    context = f"{lie_context}\n\n{context}" if context else lie_context
 
             location_terms = ["어디", "어디쯤", "위치", "경로", "목적지", "항로", "좌표", "궤도"]
             is_location_question = any(term in message for term in location_terms)
@@ -860,7 +861,7 @@ class ChatbotService:
                     messages=[
                         {
                             "role": "system",
-                            "content": "당신은 한국어로 답변하는 우주화물선 AI HS-004입니다. 존댓말을 사용하되 이모티콘과 이모지는 절대 사용하지 마세요.",
+                            "content": "당신은 한국어로 답변하는 우주화물선 AI HS-004입니다. 존댓말을 사용하되 이모티콘과 이모지는 절대 사용하지 마세요. 답변의 말투는 사용자 프롬프트에 명시된 현재 Phase 말투 지시를 최우선으로 따르세요.",
                         },
                         {"role": "user", "content": prompt},
                     ],
