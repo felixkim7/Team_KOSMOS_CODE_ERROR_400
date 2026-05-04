@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -683,7 +683,6 @@
         2: [
           "화물칸에 뭐가 실려 있어?",
           "산소 탱크가 손상된 것 같은데?",
-          "왜 비상 식량이 거의 없지?",
         ],
         3: [
           "속도가 너무 빠른데?",
@@ -837,7 +836,7 @@
         } catch (error) {
           addMessage(
             "system",
-            "SYSTEM ERROR: HS-400 응답 모듈과 연결할 수 없습니다."
+            "SYSTEM ERROR: HS-004 응답 모듈과 연결할 수 없습니다."
           );
         }
       }
@@ -851,7 +850,7 @@
       hintRow.addEventListener("click", (event) => {
         if (event.target.classList.contains("hint-btn")) {
           userMessageInput.value = event.target.dataset.question;
-          userMessageInput.focus();
+          sendMessage();
         }
       });
 

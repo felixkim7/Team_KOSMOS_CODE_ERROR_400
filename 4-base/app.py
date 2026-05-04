@@ -39,7 +39,7 @@ CONFIG_PATH = BASE_DIR / 'config' / 'chatbot_config.json'
 def load_config():
     """챗봇 설정 파일 로드"""
     try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        with open(CONFIG_PATH, 'r', encoding='utf-8-sig') as f:
             return json.load(f)
     except FileNotFoundError:
         # 기본 설정 반환
