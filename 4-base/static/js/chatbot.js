@@ -401,8 +401,16 @@ function updateLocationButtonLabels() {
 function unlockStage(stage) {
   currentStage = Math.max(currentStage, stage);
 
-  if (currentStage >= 2 && cargoBtn) {
-    cargoBtn.classList.remove("locked");
+  if (currentStage >= 2) {
+    if (cargoBtn) {
+      cargoBtn.classList.remove("locked");
+    }
+
+    // Turn off the oxygen warning alarm from Stage 2 onward
+    const warningBox = document.getElementById("air-warning-box");
+    if (warningBox) {
+      warningBox.classList.add("hidden");
+    }
   }
 
   if (currentStage >= 3) {
@@ -422,11 +430,19 @@ function reduceAirLevel(amount = 1) {
 
   airLevel = Math.max(0, airLevel - amount);
   airLevelText.textContent = airLevel;
+  const airWarningLevel = document.getElementById("air-warning-level");
+  if (airWarningLevel) {
+    airWarningLevel.textContent = airLevel;
+  }
 
-  if (airLevel === 15) {
-    const warningBox = document.getElementById("air-warning-box");
-    if (warningBox) {
+
+  const warningBox = document.getElementById("air-warning-box");
+
+  if (warningBox) {
+    if (currentStage < 2 && airLevel <= 15) {
       warningBox.classList.remove("hidden");
+    } else {
+      warningBox.classList.add("hidden");
     }
   }
 
@@ -435,7 +451,7 @@ function reduceAirLevel(amount = 1) {
   }
 
   if (airLevel <= 5) {
-    appendMessage("system", "SYSTEM: CRITICAL OXYGEN WARNING");
+    appendMessage("system", `SYSTEM: CRITICAL OXYGEN WARNING // OXYGEN LEVEL: ${airLevel}%`);
   }
 }
 
@@ -445,13 +461,26 @@ function startOxygenTimer() {
   oxygenTimerStarted = true;
 
   oxygenTimerId = setInterval(() => {
-    reduceAirLevel(1);
+    if (airLevel <= 5) {
+      airLevel = 5;
 
-    if (airLevel <= 0) {
+      if (airLevelText) {
+        airLevelText.textContent = airLevel;
+      }
+
+      const airWarningLevel = document.getElementById("air-warning-level");
+      if (airWarningLevel) {
+        airWarningLevel.textContent = airLevel;
+      }
+
       clearInterval(oxygenTimerId);
       oxygenTimerId = null;
-      appendMessage("system", "SYSTEM: OXYGEN DEPLETED");
+
+      appendMessage("system", `SYSTEM: CRITICAL OXYGEN WARNING // OXYGEN LEVEL: ${airLevel}%`);
+      return;
     }
+
+    reduceAirLevel(1);
   }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
 }
 
