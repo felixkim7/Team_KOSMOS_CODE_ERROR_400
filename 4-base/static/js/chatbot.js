@@ -219,6 +219,14 @@ function removeMessage(messageId) {
   }
 }
 
+function goToStartPage() {
+  // Clear any saved values in case you later add localStorage/sessionStorage
+  sessionStorage.clear();
+
+  // Go back to the Flask index page with a reset marker
+  window.location.href = "/?reset=1";
+}
+
 function showBadEnding() {
   if (gameEnded) return;
 
@@ -238,10 +246,19 @@ function showBadEnding() {
       <video class="ending-video" src="/static/videos/chatbot/ending_crash.mp4" autoplay muted playsinline></video>
       <h2>COLLISION COURSE LOCKED</h2>
       <p>지구 궤도 진입 승인. HS-004호는 충돌 경로를 이탈하지 못했습니다.</p>
+
+      <button class="ending-restart-btn" type="button">
+        Replay Game
+      </button>
     </div>
   `;
 
   document.body.appendChild(endingOverlay);
+
+  const restartBtn = endingOverlay.querySelector(".ending-restart-btn");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", goToStartPage);
+  }
 
   const endingVideo = endingOverlay.querySelector(".ending-video");
   if (endingVideo) {
@@ -273,10 +290,20 @@ function completeOrbitReturn() {
       <div class="ending-placeholder" aria-hidden="true"></div>
       <h2>COURSE CORRECTED</h2>
       <p><br>목적지: 화성<br>HS-004호의 경로가 변경되었습니다.</p>
+
+      <button class="ending-restart-btn" type="button">
+        Replay Game
+      </button>
+
     </div>
   `;
 
   document.body.appendChild(endingOverlay);
+
+  const restartBtn = endingOverlay.querySelector(".ending-restart-btn");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", goToStartPage);
+  }
 
   if (userMessageInput) userMessageInput.disabled = true;
   if (sendBtn) sendBtn.disabled = true;
@@ -525,7 +552,7 @@ function startOxygenTimer() {
     }
 
     reduceAirLevel(1);
-  }, 10000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
+  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
 }
 
 function startTimer() {
@@ -535,7 +562,7 @@ function startTimer() {
   timerStarted = true;
   timerCard.classList.remove("hidden");
 
-  setInterval(() => {
+  const timerIntervalId = setInterval(() => {
     timerSeconds = Math.max(0, timerSeconds - 1);
 
     const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
@@ -543,8 +570,13 @@ function startTimer() {
 
     timerValue.textContent = `${minutes}:${seconds}`;
 
-    if (timerSeconds === 0) {
+    if (timerSeconds <= 0) {
+      clearInterval(timerIntervalId);
+
       appendMessage("system", "SYSTEM: EARTH ORBIT COLLISION IMMINENT");
+      showBadEnding();
+
+      return;
     }
   }, 1000);
 }
@@ -976,6 +1008,16 @@ function closeModal(modalId) {
   if (modal) {
     modal.style.display = "none";
   }
+
+  if (modalId === "clueModal") {
+    const videoEl = document.getElementById("clueModalVideo");
+
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.removeAttribute("src");
+      videoEl.load();
+    }
+  }
 }
 
 if (videoBtn) {
@@ -996,7 +1038,7 @@ document.querySelectorAll(".modal-close").forEach((btn) => {
 document.querySelectorAll(".modal").forEach((modal) => {
   modal.addEventListener("click", (event) => {
     if (event.target === modal) {
-      modal.style.display = "none";
+      closeModal(modal.id);
     }
   });
 });
@@ -1076,41 +1118,99 @@ function placeOxygenOverlay() {
   overlay.style.fontSize = `${fontSize}px`;
 }
 
-function showClueModal(title, imageSrc) {
+function showClueModal(title, mediaSrc) {
   const modal = document.getElementById("clueModal");
   const titleEl = document.getElementById("clueModalTitle");
   const imgEl = document.getElementById("clueModalImage");
+  const videoEl = document.getElementById("clueModalVideo");
   const oxygenOverlay = document.getElementById("oxygen-overlay");
 
-  if (modal && titleEl && imgEl) {
-    titleEl.textContent = title;
-    imgEl.src = imageSrc;
-    imgEl.style.display = imageSrc ? "block" : "none";
-    modal.style.display = "block";
+  if (!modal || !titleEl || !imgEl || !videoEl) return;
 
-    // Default: hide overlay
-    if (oxygenOverlay) {
-      oxygenOverlay.style.display = "none";
-    }
+  titleEl.textContent = title;
 
-    // Only show overlay for oxygen tank clue
-    if (
-      oxygenOverlay &&
-      imageSrc &&
-      imageSrc.includes("cargohold_oxygenTank.png")
-    ) {
-      oxygenOverlay.textContent = `${airLevel}%`;
-      oxygenOverlay.style.display = "block";
+  // Reset image
+  imgEl.style.display = "none";
+  imgEl.src = "";
+  imgEl.onload = null;
 
-      // position of the number on the image
-      if (imgEl.complete) {
-        placeOxygenOverlay();
-      } else {
-        imgEl.onload = placeOxygenOverlay;
-      }
+  // Reset video
+  videoEl.style.display = "none";
+  videoEl.pause();
+  videoEl.removeAttribute("src");
+  videoEl.load();
+
+  // Hide oxygen overlay by default
+  if (oxygenOverlay) {
+    oxygenOverlay.style.display = "none";
+  }
+
+  modal.style.display = "block";
+
+  // Show video if the source is mp4
+  if (mediaSrc && mediaSrc.toLowerCase().endsWith(".mp4")) {
+    videoEl.src = mediaSrc;
+    videoEl.style.display = "block";
+
+    videoEl.play().catch((err) => {
+      console.warn("Modal video play failed:", err);
+    });
+  }
+
+  // Otherwise show image
+  else if (mediaSrc) {
+    imgEl.src = mediaSrc;
+    imgEl.style.display = "block";
+  }
+
+  
+
+  // Only show oxygen overlay for oxygen tank image
+  if (
+    oxygenOverlay &&
+    mediaSrc &&
+    mediaSrc.includes("cargohold_oxygenTank.png")
+  ) {
+    oxygenOverlay.style.display = "block";
+    updateOxygenOverlayText();
+
+    if (imgEl.complete) {
+      placeOxygenOverlay();
+    } else {
+      imgEl.onload = placeOxygenOverlay;
     }
   }
 }
+
+//   if (modal && titleEl && imgEl) {
+//     titleEl.textContent = title;
+//     imgEl.src = imageSrc;
+//     imgEl.style.display = imageSrc ? "block" : "none";
+//     modal.style.display = "block";
+
+//     // Default: hide overlay
+//     if (oxygenOverlay) {
+//       oxygenOverlay.style.display = "none";
+//     }
+
+//     // Only show overlay for oxygen tank clue
+//     if (
+//       oxygenOverlay &&
+//       imageSrc &&
+//       imageSrc.includes("cargohold_oxygenTank.png")
+//     ) {
+//       oxygenOverlay.textContent = `${airLevel}%`;
+//       oxygenOverlay.style.display = "block";
+
+//       // position of the number on the image
+//       if (imgEl.complete) {
+//         placeOxygenOverlay();
+//       } else {
+//         imgEl.onload = placeOxygenOverlay;
+//       }
+//     }
+//   }
+// }
 
 window.addEventListener("load", () => {
   const hotspotFood = document.getElementById("hotspot-food");
@@ -1174,7 +1274,7 @@ window.addEventListener("load", () => {
   if (hotspotCockpitCamera) {
     hotspotCockpitCamera.addEventListener("click", () => {
       addClueMemo("cockpitCamera");
-      showClueModal("COCKPIT CAMERA", "/static/videos/chatbot/Cockpit_Camera.mp4");
+      showClueModal("COCKPIT CAMERA", "/static/videos/chatbot/Cockpit_camera.mp4");
     });
   }
 });
