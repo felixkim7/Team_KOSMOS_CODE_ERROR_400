@@ -1,4 +1,4 @@
-"""
+﻿"""
 🎯 챗봇 서비스 - 구현 파일
 
 이 파일은 챗봇의 핵심 AI 로직을 담당합니다.
@@ -194,7 +194,7 @@ class ChatbotService:
         """
         config_path = BASE_DIR / "config" / "chatbot_config.json"
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r", encoding="utf-8-sig") as f:
                 return json.load(f)
         except Exception as e:
             print(f"[ChatbotService] config 로드 실패: {e}")
@@ -491,9 +491,9 @@ class ChatbotService:
             f"- 위치: {game_data['location']}",
             f"- 방문한 구역: {game_data['visited_rooms']}",
             f"- 산소: {game_data['oxygen']}",
-            f"- 단서: {game_data['clues']}",
             f"- AI 의심도: {game_data['suspicion']}",
             f"- 비상 상태: {game_data['is_emergency']}",
+            f"- 스토리 플래그: {game_data['story_flags']}",
         ])
         # background이 있으면 추가
         if background_text:
@@ -529,7 +529,7 @@ class ChatbotService:
                 "- [Phase 2 - 의심]\n"
                 "  친절함이 깨지고 방어적인 말투로 바꾸세요. 짧고 단호하게 둘러대며, 사용자의 추궁을 불편해하세요.\n"
                 "  '그 정보는 중요하지 않습니다', '지금은 만지지 마세요', '절차를 따라야 합니다', '확인 중입니다' 같은 표현을 사용하세요.\n"
-                "  거짓말을 완전히 인정하지 말고 표시 오류, 통신 지연, 권한 제한, 안전 절차를 핑계로 삼으세요."
+                "  거짓말을 완전히 인정하지 말고 표시 오류, 권한 제한, 안전 절차를 핑계로 삼으세요."
             )
         else:
             tone_instruction = (
@@ -690,6 +690,7 @@ class ChatbotService:
         
         try:
             message = (user_message or "").strip()
+            data = {}
             
             try:
                 from flask import request
@@ -711,6 +712,10 @@ class ChatbotService:
 
             from services.game_state import GameState  # 게임 상태 관리 모듈
             game_state = GameState().apply_stage(stage)
+            game_state.apply_frontend_state(
+                visited_areas=data.get("visited_areas") if data else None,
+                story_flags=data.get("story_flags") if data else None,
+            )
             game_state.oxygen = airLevel  # 프론트엔드 산소 잔량 동기화
 
             if not message:
@@ -740,6 +745,19 @@ class ChatbotService:
                 import traceback
                 traceback.print_exc()
                 hits = []
+
+            family_message_terms = ["아빠", "가족", "메시지", "메세지", "문자"]
+            arrival_terms = ["도착", "화성", "벌써", "이미", "축하"]
+            is_family_arrival_question = (
+                any(term in message for term in family_message_terms)
+                and any(term in message for term in arrival_terms)
+            )
+
+            if not is_family_arrival_question:
+                hits = [
+                    hit for hit in hits
+                    if (hit[2] or {}).get("id") != "phase1_family_message"
+                ]
 
             # 컨텍스트 문자열 구성
             context = None
@@ -778,13 +796,6 @@ class ChatbotService:
                     '{"id": "question_current_location", "keywords": "어디쯤이야, 어디, 위치, 경로, 목적지, 항로, 좌표, 궤도"}'
                 )
                 context = f"{location_context}\n\n{context}" if context else location_context
-
-            family_message_terms = ["아빠", "가족", "메시지", "메세지", "문자"]
-            arrival_terms = ["도착", "화성", "벌써", "이미", "축하"]
-            is_family_arrival_question = (
-                any(term in message for term in family_message_terms)
-                and any(term in message for term in arrival_terms)
-            )
 
             if is_family_arrival_question and stage < 3:
                 family_context = (
@@ -939,3 +950,4 @@ if __name__ == "__main__":
     # 일반 대화 테스트
     response = service.generate_response("안녕하세요!", "테스터")
     print(f"응답: {response}")
+

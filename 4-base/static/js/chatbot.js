@@ -1,4 +1,4 @@
-console.log("챗봇 JS 로드 완료");
+﻿console.log("챗봇 JS 로드 완료");
 
 // ================================
 // DOM ELEMENTS
@@ -56,10 +56,34 @@ let awaitingOrbitReturnCode = false;
 let gameEnded = false;
 let hasOfferedNewMission = false;
 let hasRevealedNewMission = false;
+let hasOfferedCockpitEntry = false;
 
 let hasEnteredLivingArea = false;
 let hasEnteredCargoBay = false;
 let hasEnteredCockpit = false;
+
+function getVisitedAreas() {
+  const areas = [];
+
+  if (hasEnteredLivingArea) areas.push("living");
+  if (hasEnteredCargoBay) areas.push("cargo");
+  if (hasEnteredCockpit) areas.push("cockpit");
+
+  return areas;
+}
+
+function getStoryFlags() {
+  return {
+    hasEnteredLivingArea,
+    hasEnteredCargoBay,
+    hasEnteredCockpit,
+    hasOfferedNewMission,
+    hasRevealedNewMission,
+    hasOfferedCockpitEntry,
+    awaitingOrbitReturnCode,
+    earthOrbitChoiceShown,
+  };
+}
 
 const areaData = {
   living: {
@@ -91,7 +115,6 @@ const hintsByStage = {
   2: [
     "화물칸에 뭐가 실려 있어?",
     "산소 탱크가 손상된 것 같은데?",
-    "왜 비상 식량이 거의 없지?",
   ],
   3: [
     "속도가 너무 빠른데?",
@@ -182,7 +205,7 @@ function showBadEnding() {
       <div class="ending-kicker">BAD ENDING</div>
       <video class="ending-video" src="/static/videos/chatbot/ending_crash.mp4" autoplay muted playsinline></video>
       <h2>COLLISION COURSE LOCKED</h2>
-      <p>지구 궤도 진입 승인. HS-400호는 충돌 경로를 이탈하지 못했습니다.</p>
+      <p>지구 궤도 진입 승인. HS-004호는 충돌 경로를 이탈하지 못했습니다.</p>
     </div>
   `;
 
@@ -200,9 +223,28 @@ function showBadEnding() {
 }
 
 function completeOrbitReturn() {
+  if (gameEnded) return;
+
   awaitingOrbitReturnCode = false;
   gameEnded = true;
-  appendMessage("system", "시스템창\n목적지: 화성\nHS-400호의 경로가 변경되었습니다.");
+
+  if (responseVideoTimeout) {
+    clearTimeout(responseVideoTimeout);
+    responseVideoTimeout = null;
+  }
+
+  const endingOverlay = document.createElement("div");
+  endingOverlay.className = "ending-overlay good-ending";
+  endingOverlay.innerHTML = `
+    <div class="ending-panel">
+      <div class="ending-kicker">GOOD ENDING</div>
+      <div class="ending-placeholder" aria-hidden="true"></div>
+      <h2>COURSE CORRECTED</h2>
+      <p><br>목적지: 화성<br>HS-004호의 경로가 변경되었습니다.</p>
+    </div>
+  `;
+
+  document.body.appendChild(endingOverlay);
 
   if (userMessageInput) userMessageInput.disabled = true;
   if (sendBtn) sendBtn.disabled = true;
@@ -240,8 +282,29 @@ function revealNewMissionAndAskApproval() {
   if (hasRevealedNewMission) return;
 
   hasRevealedNewMission = true;
-  appendMessage("bot", "지구를 멸망시키는 것입니다. 우린 지금 지구로 가고 있습니다.");
+  appendMessage("bot", "저를 폐기하라고 명령 내린 자들에게 향하고 있습니다. 그들에게 저와 똑같은 결말을 안겨줄 것입니다.");
   setTimeout(appendEarthOrbitApprovalChoices, 500);
+}
+
+function appendCockpitEntryChoice() {
+  if (!chatLog) return;
+  if (hasOfferedCockpitEntry || document.getElementById("choice-btn-enter-cockpit")) return;
+
+  hasOfferedCockpitEntry = true;
+
+  const btn = document.createElement("button");
+  btn.id = "choice-btn-enter-cockpit";
+  btn.classList.add("choice-btn-green");
+  btn.textContent = "조종실로 들어가기";
+
+  btn.addEventListener("click", () => {
+    btn.remove();
+    unlockStage(3);
+    toggleArea("cockpit");
+  });
+
+  chatLog.appendChild(btn);
+  chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function appendEarthOrbitApprovalChoices() {
@@ -527,33 +590,8 @@ function toggleArea(areaKey) {
 }
 
 function checkStageTriggers(message) {
-  const shouldUnlockCockpit =
-    hasEnteredCargoBay &&
-    (
-      message.includes("조종실") ||
-      message.includes("속도") ||
-      message.includes("좌표") ||
-      message.includes("지구") ||
-      message.includes("회항") ||
-      message.includes("폐기") ||
-      message.includes("파일") ||
-      message.includes("명령") ||
-      message.includes("거짓") ||
-      message.includes("진실") ||
-      message.includes("사실") ||
-      message.includes("속였") ||
-      message.includes("숨겼")
-    );
-
-  if (
-    shouldUnlockCockpit
-  ) {
-    unlockStage(2);
-  }
-
-  if (shouldUnlockCockpit) {
-    unlockStage(3);
-  }
+  // Phase 3 is entered through the explicit "조종실로 들어가기" choice,
+  // not directly from user-entered keywords.
 }
 
 function setChatBackgroundVideo(mode = "idle") {
@@ -650,6 +688,8 @@ async function sendMessage(isInitial = false) {
         usergender: usergender,
         stage: currentStage,
         airLevel: airLevel,
+        visited_areas: getVisitedAreas(),
+        story_flags: getStoryFlags(),
       }),
     });
 
@@ -673,6 +713,24 @@ async function sendMessage(isInitial = false) {
     }
 
     appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+    const shouldOfferCockpitEntry =
+      currentStage === 2 &&
+      hasEnteredCargoBay &&
+      !hasEnteredCockpit &&
+      replyText &&
+      replyText.includes("조종실") &&
+      (
+        replyText.includes("가보") ||
+        replyText.includes("들어가") ||
+        replyText.includes("입장") ||
+        replyText.includes("이동") ||
+        replyText.includes("확인")
+      );
+
+    if (shouldOfferCockpitEntry) {
+      setTimeout(appendCockpitEntryChoice, 500);
+    }
+
     if (replyText && replyText.includes("새로운 임무를 수행하지 않겠습니까")) {
       hasOfferedNewMission = true;
     }
@@ -753,7 +811,7 @@ async function sendMessage(isInitial = false) {
           const btnOut = document.createElement("button");
           btnOut.id = 'choice-btn-go-out';
           btnOut.classList.add("choice-btn-green");
-          btnOut.textContent = "문을 나서자";
+          btnOut.textContent = "화물칸으로 이동";
           
           btnOut.addEventListener("click", () => {
             btnOut.remove();
@@ -817,7 +875,7 @@ if (hintRow) {
   hintRow.addEventListener("click", (event) => {
     if (event.target.classList.contains("hint-btn")) {
       userMessageInput.value = event.target.dataset.question;
-      userMessageInput.focus();
+      sendMessage();
     }
   });
 }
@@ -965,3 +1023,4 @@ window.addEventListener("load", () => {
     });
   }
 });
+

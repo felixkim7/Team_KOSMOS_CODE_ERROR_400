@@ -119,26 +119,27 @@
     }
 
     .close-btn {
-      width: 48px;
+      width: auto;
       height: 48px;
-      min-width: 48px;
+      min-width: 132px;
       min-height: 48px;
 
-      padding: 0;
+      padding: 0 18px;
       margin: 0;
 
       display: flex;
       align-items: center;
       justify-content: center;
 
-      border-radius: 50%;
+      border-radius: 8px;
       background: rgba(0, 18, 30, 0.35);
       border: 1px solid rgba(143, 246, 255, 0.55);
 
       color: #bfffff;
-      font-size: 2rem;
-      font-weight: 400;
-      line-height: 1;
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0;
 
       cursor: pointer;
       box-shadow:
@@ -632,7 +633,7 @@
       </div>
 
       <button class="close-btn" onclick="window.location.href='{{ url_for('index') }}'">
-        &times;
+        항해를 종료
       </button>
     </header>
 
