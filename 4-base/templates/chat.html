@@ -119,19 +119,42 @@
     }
 
     .close-btn {
-      width: 38px;
-      height: 38px;
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
+
+      padding: 0;
+      margin: 0;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
       border-radius: 50%;
-      background: transparent;
-      border: 1px solid rgba(143, 246, 255, 0.42);
-      color: #8ff6ff;
-      font-size: 1.4rem;
+      background: rgba(0, 18, 30, 0.35);
+      border: 1px solid rgba(143, 246, 255, 0.55);
+
+      color: #bfffff;
+      font-size: 2rem;
+      font-weight: 400;
+      line-height: 1;
+
       cursor: pointer;
+      box-shadow:
+        0 0 14px rgba(0, 229, 255, 0.12),
+        inset 0 0 18px rgba(0, 229, 255, 0.04);
+
+      transition: 0.2s;
     }
 
     .close-btn:hover {
+      color: #ffffff;
       background: rgba(0, 229, 255, 0.13);
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.45);
+      border-color: rgba(143, 246, 255, 0.9);
+      box-shadow:
+        0 0 18px rgba(0, 229, 255, 0.45),
+        inset 0 0 18px rgba(0, 229, 255, 0.12);
     }
 
     .main-layout {
@@ -636,7 +659,7 @@
 
         <div class="memo-box">
           <label for="user-memo">USER MEMO</label>
-          <textarea id="user-memo" placeholder="AI의 모순점, 단서, 의심되는 점을 기록하세요..."></textarea>
+          <textarea id="user-memo" placeholder="단서를 기록하세요..."></textarea>
         </div>
 
         <div class="location-buttons">

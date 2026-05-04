@@ -51,6 +51,10 @@ let oxygenTimerStarted = false;
 let oxygenTimerId = null;
 let alarmQueryCount = 0;
 
+let hasEnteredLivingArea = false;
+let hasEnteredCargoBay = false;
+let hasEnteredCockpit = false;
+
 const areaData = {
   living: {
     title: "LIVING AREA",
@@ -64,6 +68,12 @@ const areaData = {
     title: "COCKPIT",
     image: "/static/images/chatbot/Cockpit.png",
   },
+};
+
+const areaButtonLabels = {
+  living: "View Living Area",
+  cargo: "View Cargo Bay",
+  cockpit: "View Cockpit",
 };
 
 const hintsByStage = {
@@ -157,7 +167,26 @@ function updateHints() {
 
   hintRow.innerHTML = "";
 
-  const hints = hintsByStage[currentStage] || hintsByStage[1];
+  let hints;
+
+  // Even if Stage 2 is unlocked, keep showing Stage 1 questions
+  // until the player actually enters Cargo Bay.
+  if (currentStage === 2 && !hasEnteredCargoBay) {
+    hints = hintsByStage[1];
+  } 
+  
+  else if (currentStage === 3 && !hasEnteredCockpit) {
+    if (hasEnteredCargoBay) {
+      hints = hintsByStage[2];
+    } else {
+      hints = hintsByStage[1];
+    }
+
+  }
+   
+  else {
+    hints = hintsByStage[currentStage] || hintsByStage[1];
+  }
 
   hints.forEach((question) => {
     const btn = document.createElement("button");
@@ -165,6 +194,18 @@ function updateHints() {
     btn.dataset.question = question;
     btn.textContent = question;
     hintRow.appendChild(btn);
+  });
+}
+
+function updateLocationButtonLabels() {
+  document.querySelectorAll(".location-btn").forEach((btn) => {
+    const areaKey = btn.dataset.area;
+
+    if (openedArea === areaKey) {
+      btn.textContent = "Return to Chat";
+    } else {
+      btn.textContent = areaButtonLabels[areaKey] || "View Area";
+    }
   });
 }
 
@@ -270,6 +311,10 @@ function toggleArea(areaKey) {
   if (openedArea === areaKey) {
     areaViewer.classList.remove("active");
     openedArea = null;
+
+    updateLocationButtonLabels();
+
+
     if (hotspotFood) hotspotFood.style.display = "none";
     if (hotspotSystem) hotspotSystem.style.display = "none";
     if (hotspotMessage) hotspotMessage.style.display = "none";
@@ -287,6 +332,22 @@ function toggleArea(areaKey) {
   if (!area) return;
 
   openedArea = areaKey;
+
+  updateLocationButtonLabels();
+
+  if (areaKey === "living") {
+    hasEnteredLivingArea = true;
+  }
+
+  if (areaKey === "cargo") {
+    hasEnteredCargoBay = true;
+    updateHints();
+  }
+
+  if (areaKey === "cockpit") {
+    hasEnteredCockpit = true;
+    updateHints();
+  }
 
   areaTitle.textContent = area.title;
   areaImage.src = area.image;
@@ -345,11 +406,14 @@ function toggleArea(areaKey) {
 
 function checkStageTriggers(message) {
   if (
-    message.includes("화물칸") ||
-    message.includes("비상 식량") ||
-    message.includes("산소 탱크") ||
-    message.includes("산소탱크") ||
-    message.includes("화물")
+    hasEnteredCargoBay &&
+    (
+      message.includes("조종실") ||
+      message.includes("궤도") ||
+      message.includes("속도") ||
+      message.includes("지구") ||
+      message.includes("회항")
+    )
   ) {
     unlockStage(2);
   }
@@ -407,6 +471,7 @@ async function sendMessage(isInitial = false) {
     if (areaViewer) {
       areaViewer.classList.remove("active");
       openedArea = null;
+      updateLocationButtonLabels();
       if (document.getElementById("hotspot-food")) document.getElementById("hotspot-food").style.display = "none";
       if (document.getElementById("hotspot-system")) document.getElementById("hotspot-system").style.display = "none";
       if (document.getElementById("hotspot-message")) document.getElementById("hotspot-message").style.display = "none";
