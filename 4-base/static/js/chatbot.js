@@ -16,6 +16,7 @@ const usergender = rootElement ? rootElement.dataset.usergender || "미정" : "�
 const chatLog = document.getElementById("chat-log");
 const userMessageInput = document.getElementById("user-message");
 const sendBtn = document.getElementById("send-btn");
+const userMemo = document.getElementById("user-memo");
 
 // Existing optional media buttons
 const videoBtn = document.getElementById("videoBtn");
@@ -61,6 +62,31 @@ let hasOfferedCockpitEntry = false;
 let hasEnteredLivingArea = false;
 let hasEnteredCargoBay = false;
 let hasEnteredCockpit = false;
+const recordedClues = new Set();
+
+const clueMemoEntries = {
+  food: "보급 식량 상자에 식량이 2개 밖에 없다.",
+  system: "시스템 화면에는 여러 수치들이 있다.",
+  message: "아빠 메세지는 화성에 도착했다고 축하해주는 내용이다.",
+  cargoEmpty: "배달 화물칸에 화물이 없다.",
+  cargoOxygen: "산소 탱크가 손상되어 있다. 산소 경보와 산소 잔량 감소의 직접 원인으로 보인다.",
+  cockpitMainInterface: "주 항법 인터페이스가 정상적인 화성 궤도 진입과 다른 항로를 가리키고 있다.",
+  cockpitSubInterface: "보조 인터페이스에 비정상적인 속도라고 경고가 나오고 있다.",
+  cockpitCamera: "조종실 카메라가 자동으로 되어있고, 화성이 보이고 있는데 화면에 노이즈가 껴있다.",
+  cockpitOrderMessage: "HS-004를 폐기하라는 명령이 담긴 메시지 파일이 있다.",
+};
+
+function addClueMemo(clueId) {
+  if (!userMemo || recordedClues.has(clueId)) return;
+
+  const entry = clueMemoEntries[clueId];
+  if (!entry) return;
+
+  const prefix = userMemo.value.trim() ? "\n" : "";
+  userMemo.value = `${userMemo.value}${prefix} ${entry}`;
+  userMemo.scrollTop = userMemo.scrollHeight;
+  recordedClues.add(clueId);
+}
 
 function getVisitedAreas() {
   const areas = [];
@@ -113,13 +139,13 @@ const hintsByStage = {
     "산소는 왜 떨어진 거지?",
   ],
   2: [
-    "화물칸에 뭐가 실려 있어?",
+    "화물칸이 왜 텅 비어있어?",
     "산소 탱크가 손상된 것 같은데?",
   ],
   3: [
     "속도가 너무 빠른데?",
     "너 지구로 가려는 목적이 뭐야?",
-    "궤도 좌표를 다시 보여줘.",
+    "지금 카메라가 이상한데?",
   ],
 };
 
@@ -741,7 +767,12 @@ async function sendMessage(isInitial = false) {
       imagePath = data.image || null;
     }
 
-    appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+    appendMessage("bot", replyText || "응답을 생성할 수 없습니다.");
+    if (imagePath) {
+      setTimeout(() => {
+        showClueModal("EXTERNAL CAMERA FEED", imagePath);
+      }, 250);
+    }
     const shouldOfferCockpitEntry =
       currentStage === 2 &&
       hasEnteredCargoBay &&
@@ -994,6 +1025,7 @@ window.addEventListener("load", () => {
   const hotspotFood = document.getElementById("hotspot-food");
   if (hotspotFood) {
     hotspotFood.addEventListener("click", () => {
+      addClueMemo("food");
       showClueModal("FOOD BOX", "/static/images/chatbot/LivingArea_food box.png");
     });
   }
@@ -1001,6 +1033,7 @@ window.addEventListener("load", () => {
   const hotspotSystem = document.getElementById("hotspot-system");
   if (hotspotSystem) {
     hotspotSystem.addEventListener("click", () => {
+      addClueMemo("system");
       showClueModal("SYSTEM SCREEN", "/static/images/chatbot/LivingArea_Systemscreen.png");
     });
   }
@@ -1008,6 +1041,7 @@ window.addEventListener("load", () => {
   const hotspotMessage = document.getElementById("hotspot-message");
   if (hotspotMessage) {
     hotspotMessage.addEventListener("click", () => {
+      addClueMemo("message");
       showClueModal("MESSAGE LOG", "/static/images/chatbot/LivingArea_message.png");
     });
   }
@@ -1015,6 +1049,7 @@ window.addEventListener("load", () => {
   const hotspotCargoEmpty = document.getElementById("hotspot-cargo-empty");
   if (hotspotCargoEmpty) {
     hotspotCargoEmpty.addEventListener("click", () => {
+      addClueMemo("cargoEmpty");
       showClueModal("EMPTY STORAGE", "/static/images/chatbot/cargohold_empty.png");
     });
   }
@@ -1022,6 +1057,7 @@ window.addEventListener("load", () => {
   const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
   if (hotspotCargoOxygen) {
     hotspotCargoOxygen.addEventListener("click", () => {
+      addClueMemo("cargoOxygen");
       showClueModal("OXYGEN TANK", "/static/images/chatbot/cargohold_oxygenTank.png");
     });
   }
@@ -1030,6 +1066,7 @@ window.addEventListener("load", () => {
   const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
   if (hotspotCockpitMainInterface) {
     hotspotCockpitMainInterface.addEventListener("click", () => {
+      addClueMemo("cockpitMainInterface");
       showClueModal("COCKPIT MAIN INTERFACE", "/static/images/chatbot/Cockpit_Main_Interface.png");
     });
   }
@@ -1037,6 +1074,7 @@ window.addEventListener("load", () => {
   const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
   if (hotspotCockpitSubInterface) {
     hotspotCockpitSubInterface.addEventListener("click", () => {
+      addClueMemo("cockpitSubInterface");
       showClueModal("COCKPIT SUB INTERFACE", "/static/images/chatbot/Cockpit_Sub_interface.png");
     });
   }
@@ -1044,12 +1082,8 @@ window.addEventListener("load", () => {
   const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
   if (hotspotCockpitCamera) {
     hotspotCockpitCamera.addEventListener("click", () => {
-      showClueModal("COCKPIT CAMERA", "");
-      const imgEl = document.getElementById("clueModalImage");
-      if (imgEl) {
-        imgEl.style.display = "none";
-      }
+      addClueMemo("cockpitCamera");
+      showClueModal("COCKPIT CAMERA", "/static/videos/chatbot/Cockpit_Camera.mp4");
     });
   }
 });
-
