@@ -785,6 +785,7 @@
 
       async function sendMessage() {
         const message = userMessageInput.value.trim();
+        const normalizedMessage = message.replace(/\s+/g, "");
 
         if (!message) return;
 
@@ -806,8 +807,11 @@
 
         if (
           message.includes("조종실") ||
-          message.includes("속도") ||
-          message.includes("지구")
+          message.includes("지구") ||
+          message.includes("화성 궤도") ||
+          message.includes("궤도 진입") ||
+          normalizedMessage.includes("화성궤도") ||
+          normalizedMessage.includes("궤도진입")
         ) {
           unlockStage(3);
         }
@@ -822,6 +826,8 @@
               message,
               username,
               usergender,
+              stage: currentStage,
+              airLevel,
             }),
           });
 

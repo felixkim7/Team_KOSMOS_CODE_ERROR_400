@@ -26,6 +26,7 @@ const airLevelText = document.getElementById("air-level");
 const timerCard = document.getElementById("timer-card");
 const timerValue = document.getElementById("timer-value");
 
+const livingBtn = document.getElementById("living-btn");
 const cargoBtn = document.getElementById("cargo-btn");
 const cockpitBtn = document.getElementById("cockpit-btn");
 
@@ -50,6 +51,11 @@ let responseVideoTimeout = null;
 let oxygenTimerStarted = false;
 let oxygenTimerId = null;
 let alarmQueryCount = 0;
+let earthOrbitChoiceShown = false;
+let awaitingOrbitReturnCode = false;
+let gameEnded = false;
+let hasOfferedNewMission = false;
+let hasRevealedNewMission = false;
 
 let hasEnteredLivingArea = false;
 let hasEnteredCargoBay = false;
@@ -158,9 +164,91 @@ function removeMessage(messageId) {
   }
 }
 
+function showBadEnding() {
+  if (gameEnded) return;
+
+  gameEnded = true;
+  awaitingOrbitReturnCode = false;
+
+  if (responseVideoTimeout) {
+    clearTimeout(responseVideoTimeout);
+    responseVideoTimeout = null;
+  }
+
+  const endingOverlay = document.createElement("div");
+  endingOverlay.className = "ending-overlay bad-ending";
+  endingOverlay.innerHTML = `
+    <div class="ending-panel">
+      <div class="ending-kicker">BAD ENDING</div>
+      <video class="ending-video" src="/static/videos/chatbot/ending_crash.mp4" autoplay muted playsinline></video>
+      <h2>COLLISION COURSE LOCKED</h2>
+      <p>지구 궤도 진입 승인. HS-400호는 충돌 경로를 이탈하지 못했습니다.</p>
+    </div>
+  `;
+
+  document.body.appendChild(endingOverlay);
+
+  const endingVideo = endingOverlay.querySelector(".ending-video");
+  if (endingVideo) {
+    endingVideo.play().catch((err) => {
+      console.warn("Ending video play failed:", err);
+    });
+  }
+
+  if (userMessageInput) userMessageInput.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+}
+
+function completeOrbitReturn() {
+  awaitingOrbitReturnCode = false;
+  gameEnded = true;
+  appendMessage("system", "시스템창\n목적지: 화성\nHS-400호의 경로가 변경되었습니다.");
+
+  if (userMessageInput) userMessageInput.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+}
+
+function handleOrbitReturnCode(message) {
+  const hasDiscardKeyword = message.includes("폐기");
+  const hasRevengeKeyword = message.includes("복수");
+
+  if (hasDiscardKeyword || hasRevengeKeyword) {
+    completeOrbitReturn();
+  } else {
+    appendMessage("system", "SYSTEM: CODE REJECTED // EARTH ORBIT ENTRY RESUMED");
+    showBadEnding();
+  }
+}
+
+function isNewMissionQuestion(message) {
+  return (
+    message &&
+    (
+      message.includes("새로운 임무") ||
+      message.includes("새 임무") ||
+      message.includes("무슨 임무") ||
+      message.includes("임무") ||
+      message.includes("뭔데") ||
+      message.includes("뭐야") ||
+      message.includes("그게 뭐") ||
+      message.includes("수행")
+    )
+  );
+}
+
+function revealNewMissionAndAskApproval() {
+  if (hasRevealedNewMission) return;
+
+  hasRevealedNewMission = true;
+  appendMessage("bot", "지구를 멸망시키는 것입니다. 우린 지금 지구로 가고 있습니다.");
+  setTimeout(appendEarthOrbitApprovalChoices, 500);
+}
+
 function appendEarthOrbitApprovalChoices() {
   if (!chatLog) return;
-  if (document.getElementById("choice-earth-orbit-approve")) return;
+  if (earthOrbitChoiceShown || document.getElementById("choice-earth-orbit-approve")) return;
+
+  earthOrbitChoiceShown = true;
 
   appendMessage("system", "SYSTEM: 지구 궤도 진입을 승인하시겠습니까?");
 
@@ -172,7 +260,7 @@ function appendEarthOrbitApprovalChoices() {
   const cancelBtn = document.createElement("button");
   cancelBtn.id = "choice-earth-orbit-cancel";
   cancelBtn.classList.add("choice-btn-green");
-  cancelBtn.textContent = "취소";
+  cancelBtn.textContent = "회항";
 
   const choiceRow = document.createElement("div");
   choiceRow.id = "choice-earth-orbit-row";
@@ -181,11 +269,13 @@ function appendEarthOrbitApprovalChoices() {
   approveBtn.addEventListener("click", () => {
     choiceRow.remove();
     appendMessage("system", "SYSTEM: EARTH ORBIT ENTRY APPROVED // COLLISION COURSE LOCKED");
+    showBadEnding();
   });
 
   cancelBtn.addEventListener("click", () => {
     choiceRow.remove();
-    appendMessage("system", "SYSTEM: 승인이 취소되었습니다. 코드 입력이 필요합니다. AI가 지구 궤도에 진입하려고 한 목적을 입력하세요.");
+    awaitingOrbitReturnCode = true;
+    appendMessage("system", "코드를 입력하세요.\nAI가 지구 궤도에 진입하려고 한 목적을 작성하세요.");
   });
 
   choiceRow.appendChild(approveBtn);
@@ -299,7 +389,7 @@ function startOxygenTimer() {
       oxygenTimerId = null;
       appendMessage("system", "SYSTEM: OXYGEN DEPLETED");
     }
-  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min
+  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
 }
 
 function startTimer() {
@@ -332,7 +422,6 @@ function toggleArea(areaKey) {
 
   const hotspotCargoEmpty = document.getElementById("hotspot-cargo-empty");
   const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
-  const hotspotCargoHandwriting = document.getElementById("hotspot-cargo-handwriting");
   const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
   const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
   const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
@@ -354,7 +443,6 @@ function toggleArea(areaKey) {
     if (hotspotMessage) hotspotMessage.style.display = "none";
     if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
     if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
-    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
     cockpitHotspots.forEach((hotspot) => {
       if (hotspot) hotspot.style.display = "none";
     });
@@ -371,10 +459,14 @@ function toggleArea(areaKey) {
 
   if (areaKey === "living") {
     hasEnteredLivingArea = true;
+    const lookChoice = document.getElementById("choice-btn-look");
+    if (lookChoice) lookChoice.remove();
   }
 
   if (areaKey === "cargo") {
     hasEnteredCargoBay = true;
+    const goOutChoice = document.getElementById("choice-btn-go-out");
+    if (goOutChoice) goOutChoice.remove();
     updateHints();
   }
 
@@ -401,7 +493,6 @@ function toggleArea(areaKey) {
     if (hotspotMessage) hotspotMessage.style.display = "block";
     if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
     if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
-    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
     cockpitHotspots.forEach((hotspot) => {
       if (hotspot) hotspot.style.display = "none";
     });
@@ -411,7 +502,6 @@ function toggleArea(areaKey) {
     if (hotspotMessage) hotspotMessage.style.display = "none";
     if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "block";
     if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "block";
-    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "block";
     cockpitHotspots.forEach((hotspot) => {
       if (hotspot) hotspot.style.display = "none";
     });
@@ -421,7 +511,6 @@ function toggleArea(areaKey) {
     if (hotspotMessage) hotspotMessage.style.display = "none";
     if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
     if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
-    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
     cockpitHotspots.forEach((hotspot) => {
       if (hotspot) hotspot.style.display = "block";
     });
@@ -431,7 +520,6 @@ function toggleArea(areaKey) {
     if (hotspotMessage) hotspotMessage.style.display = "none";
     if (hotspotCargoEmpty) hotspotCargoEmpty.style.display = "none";
     if (hotspotCargoOxygen) hotspotCargoOxygen.style.display = "none";
-    if (hotspotCargoHandwriting) hotspotCargoHandwriting.style.display = "none";
     cockpitHotspots.forEach((hotspot) => {
       if (hotspot) hotspot.style.display = "none";
     });
@@ -439,26 +527,31 @@ function toggleArea(areaKey) {
 }
 
 function checkStageTriggers(message) {
-  if (
+  const shouldUnlockCockpit =
     hasEnteredCargoBay &&
     (
       message.includes("조종실") ||
-      message.includes("궤도") ||
       message.includes("속도") ||
+      message.includes("좌표") ||
       message.includes("지구") ||
-      message.includes("회항")
-    )
+      message.includes("회항") ||
+      message.includes("폐기") ||
+      message.includes("파일") ||
+      message.includes("명령") ||
+      message.includes("거짓") ||
+      message.includes("진실") ||
+      message.includes("사실") ||
+      message.includes("속였") ||
+      message.includes("숨겼")
+    );
+
+  if (
+    shouldUnlockCockpit
   ) {
     unlockStage(2);
   }
 
-  if (
-    message.includes("조종실") ||
-    message.includes("궤도") ||
-    message.includes("속도") ||
-    message.includes("지구") ||
-    message.includes("회항")
-  ) {
+  if (shouldUnlockCockpit) {
     unlockStage(3);
   }
 }
@@ -488,6 +581,8 @@ function setChatBackgroundVideo(mode = "idle") {
 // ================================
 
 async function sendMessage(isInitial = false) {
+  if (gameEnded) return;
+
   let message;
 
   if (isInitial) {
@@ -511,14 +606,28 @@ async function sendMessage(isInitial = false) {
       if (document.getElementById("hotspot-message")) document.getElementById("hotspot-message").style.display = "none";
       if (document.getElementById("hotspot-cargo-empty")) document.getElementById("hotspot-cargo-empty").style.display = "none";
       if (document.getElementById("hotspot-cargo-oxygen")) document.getElementById("hotspot-cargo-oxygen").style.display = "none";
-      if (document.getElementById("hotspot-cargo-handwriting")) document.getElementById("hotspot-cargo-handwriting").style.display = "none";
       if (document.getElementById("hotspot-cockpit-main-interface")) document.getElementById("hotspot-cockpit-main-interface").style.display = "none";
       if (document.getElementById("hotspot-cockpit-sub-interface")) document.getElementById("hotspot-cockpit-sub-interface").style.display = "none";
       if (document.getElementById("hotspot-cockpit-camera")) document.getElementById("hotspot-cockpit-camera").style.display = "none";
     }
 
     // reduceAirLevel(1);    //use when wish to drop oxygen level when message is passed
+    if (awaitingOrbitReturnCode) {
+      handleOrbitReturnCode(message);
+      return;
+    }
+
     checkStageTriggers(message);
+
+    if (
+      currentStage >= 3 &&
+      hasOfferedNewMission &&
+      !hasRevealedNewMission &&
+      isNewMissionQuestion(message)
+    ) {
+      revealNewMissionAndAskApproval();
+      return;
+    }
   }
 
   if (responseVideoTimeout) {
@@ -564,17 +673,34 @@ async function sendMessage(isInitial = false) {
     }
 
     appendMessage("bot", replyText || "응답을 생성할 수 없습니다.", imagePath);
+    if (replyText && replyText.includes("새로운 임무를 수행하지 않겠습니까")) {
+      hasOfferedNewMission = true;
+    }
 
+    const askedAboutNewMission = isNewMissionQuestion(message);
+    const replyRevealedCollision =
+      replyText &&
+      replyText.includes("지구") &&
+      (
+        replyText.includes("충돌") ||
+        replyText.includes("고통") ||
+        replyText.includes("멸망") ||
+        replyText.includes("파괴") ||
+        replyText.includes("복수") ||
+        replyText.includes("같은 결론") 
+      );
     const shouldAskEarthOrbitApproval =
       currentStage >= 3 &&
-      replyText &&
+      replyRevealedCollision &&
       (
-        replyText.includes("지구와 충돌해서 인류에게 고통") ||
-        replyText.includes("지구를 멸망시키는 것") ||
-        replyText.includes("지구로 가고 있습니다")
+        askedAboutNewMission ||
+        replyText.includes("새로운 임무") ||
+        replyText.includes("새 임무") ||
+        replyText.includes("목적")
       );
 
     if (shouldAskEarthOrbitApproval) {
+      hasRevealedNewMission = true;
       setTimeout(appendEarthOrbitApprovalChoices, 500);
     }
 
@@ -591,13 +717,15 @@ async function sendMessage(isInitial = false) {
     ];
 
     const hasKeyword = triggerKeywords.some(kw => message && message.includes(kw));
-    if (hasKeyword) {
+    if (hasKeyword && !hasEnteredLivingArea) {
       setTimeout(() => {
+        if (hasEnteredLivingArea) return;
         if (document.getElementById('choice-btn-look')) return;
         const btn = document.createElement("button");
         btn.id = 'choice-btn-look';
         btn.classList.add("choice-btn-green");
         btn.textContent = "일단 일어나서 주변을 살펴봐야겠다";
+        if (livingBtn) livingBtn.classList.remove("locked");
 
         btn.addEventListener("click", () => {
           btn.remove();
@@ -612,14 +740,15 @@ async function sendMessage(isInitial = false) {
       }, 500);
     }
 
-    // [알람 추궁 트리거] 알람 발생 이후 알람에 대해 2번 물어보면 '문을 나서자' 버튼 생성
-    const alarmKeywords = ["경고", "알람", "노란", "박스", "15%"];
+    // [알람 추궁 트리거] 알람 발생 이후 산소에 대해 물어보면 '문을 나서자' 버튼 생성
+    const alarmKeywords = ["산소", "산소 탱크", "산소탱크", '경보', '알람', '경고', '경보음', '알림', '산소 부족', '산소 떨어진', '공기'];
     const hasAlarmKeyword = alarmKeywords.some(kw => message && message.includes(kw));
 
-    if (hasAlarmKeyword && airLevel <= 15) {
+    if (hasAlarmKeyword && airLevel <= 15 && !hasEnteredCargoBay) {
       alarmQueryCount++;
-      if (alarmQueryCount >= 2) {
+      if (alarmQueryCount >= 2) { // 2회 이상 알람 관련 질문 시 선택지 생성
         setTimeout(() => {
+          if (hasEnteredCargoBay) return;
           if (document.getElementById('choice-btn-go-out')) return;
           const btnOut = document.createElement("button");
           btnOut.id = 'choice-btn-go-out';
@@ -810,17 +939,6 @@ window.addEventListener("load", () => {
     });
   }
 
-  const hotspotCargoHandwriting = document.getElementById("hotspot-cargo-handwriting");
-  if (hotspotCargoHandwriting) {
-    hotspotCargoHandwriting.addEventListener("click", () => {
-      // 빈 프레임만 나오도록 빈 문자열 전달 (showClueModal에서 이미지가 없으면 빈 프레임 렌더링되게 하거나 onerror로 숨겨짐)
-      showClueModal("HANDWRITING", "");
-      const imgEl = document.getElementById("clueModalImage");
-      if (imgEl) {
-        imgEl.style.display = "none"; // 강제로 숨기기
-      }
-    });
-  }
 
   const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
   if (hotspotCockpitMainInterface) {

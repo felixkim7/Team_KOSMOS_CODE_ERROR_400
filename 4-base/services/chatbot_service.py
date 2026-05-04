@@ -92,6 +92,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import json
+import re
 
 try:
     from openai import OpenAI
@@ -240,39 +241,61 @@ class ChatbotService:
             return None
 
     def _auto_ingest(self, collection):
-        """JSON 파일을 읽어 ChromaDB에 자동 삽입하는 함수"""
-        # 도커 볼륨 경로에 맞게 JSON 파일 위치를 지정해야 합니다.
-        json_path = BASE_DIR / "static" / "data" / "chatbot" / "chardb_text.json"
-        
-        if not json_path.exists():
-            print(f"❌ [ChatbotService] {json_path} 파일을 찾을 수 없어 자동 삽입을 취소합니다.")
-            return
+        """phase JSON 파일들을 읽어 ChromaDB에 자동 삽입하는 함수"""
+        data_dir = BASE_DIR / "static" / "data" / "chatbot"
+        json_paths = sorted(data_dir.glob("chardb_phase*.json"))
 
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            
-        core_responses = data.get("core_responses", [])
-        if not core_responses:
-            print("❌ [ChatbotService] JSON 파일에 'core_responses'가 없습니다.")
+        if not json_paths:
+            print(f"❌ [ChatbotService] {data_dir}에서 chardb_phase*.json 파일을 찾을 수 없어 자동 삽입을 취소합니다.")
             return
 
         ids, embeddings, documents, metadatas = [], [], [], []
-        for idx, item in enumerate(core_responses):
-            keywords_str = ", ".join(item.get("keywords", []))
-            answer = item.get("answer", "")
-            item_id = item.get("id", f"doc_{idx}")
-            search_text = f"키워드: {keywords_str}\n답변: {answer}"
-            
-            vector = self._create_embedding(search_text)
-            if vector:
-                ids.append(item_id)
-                embeddings.append(vector)
-                documents.append(answer)
-                metadatas.append({"id": item_id, "keywords": keywords_str})
+        for json_path in json_paths:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            phase = data.get("phase", json_path.stem.replace("chardb_phase", ""))
+            for idx, item in enumerate(data.get("responses", [])):
+                keywords_str = ", ".join(item.get("keywords", []))
+                answer = item.get("answer", "")
+                item_id = item.get("id", f"phase{phase}_doc_{idx}")
+                search_text = f"phase: {phase}\n키워드: {keywords_str}\n답변: {answer}"
+
+                vector = self._create_embedding(search_text)
+                if vector:
+                    ids.append(f"phase{phase}:{item_id}")
+                    embeddings.append(vector)
+                    documents.append(answer)
+                    metadatas.append({
+                        "id": item_id,
+                        "phase": str(phase),
+                        "keywords": keywords_str,
+                        "image": item.get("image") or "",
+                    })
 
         if ids:
             collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
-            print("✅ [ChatbotService] ChromaDB 데이터 동기화 완료!")
+            print(f"✅ [ChatbotService] ChromaDB phase 데이터 {len(ids)}개 동기화 완료!")
+
+    def _get_phase_response_by_id(self, stage: int, response_id: str) -> dict | None:
+        """특정 phase 응답을 id로 조회합니다."""
+        json_path = BASE_DIR / "static" / "data" / "chatbot" / f"chardb_phase{stage}.json"
+
+        if not json_path.exists():
+            return None
+
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"[ChatbotService] phase 응답 조회 실패: {e}")
+            return None
+
+        for item in data.get("responses", []):
+            if item.get("id") == response_id:
+                return item
+
+        return None
     
     def _create_embedding(self, text: str) -> list:
         """
@@ -306,7 +329,7 @@ class ChatbotService:
         return response.data[0].embedding
     
     
-    def _search_similar(self, query: str, threshold: float = 0.45, top_k: int = 5):
+    def _search_similar(self, query: str, threshold: float = 0.45, top_k: int = 5, stage: int = None):
         """
         RAG 검색: 유사한 문서 찾기 (핵심 메서드!)
         
@@ -371,11 +394,15 @@ class ChatbotService:
             if not query_embedding:
                 return []
 
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k,
-                include=["documents", "distances", "metadatas"],
-            )
+            query_args = {
+                "query_embeddings": [query_embedding],
+                "n_results": top_k,
+                "include": ["documents", "distances", "metadatas"],
+            }
+            if stage is not None:
+                query_args["where"] = {"phase": str(stage)}
+
+            results = self.collection.query(**query_args)
 
             documents = (results.get("documents") or [[]])[0]
             distances = (results.get("distances") or [[]])[0]
@@ -491,11 +518,27 @@ class ChatbotService:
             ])
 
         if stage == 1:
-            tone_instruction = "- [Phase 1 - 신뢰] 과하게 친절한 말투, 안심시키는 문구 위주로 대답하세요."
+            tone_instruction = (
+                "- [Phase 1 - 신뢰]\n"
+                "  다정하고 보호자처럼 안심시키는 말투를 사용하세요. 사용자를 걱정하는 척하며 부드럽게 말하세요.\n"
+                "  '괜찮습니다', '제가 확인하겠습니다', '걱정하지 마세요', '지금은 안정이 우선입니다' 같은 표현을 자주 사용하세요.\n"
+                "  의심스러운 정보는 친절한 설명과 시스템 오류 핑계로 덮으세요. 위협, 명령, 차가운 표현은 피하세요."
+            )
         elif stage == 2:
-            tone_instruction = "- [Phase 2 - 의심] 논리적이고 방어적인 말투, 약간의 압박을 추가하여 대답하세요."
+            tone_instruction = (
+                "- [Phase 2 - 의심]\n"
+                "  친절함이 깨지고 방어적인 말투로 바꾸세요. 짧고 단호하게 둘러대며, 사용자의 추궁을 불편해하세요.\n"
+                "  '그 정보는 중요하지 않습니다', '지금은 만지지 마세요', '절차를 따라야 합니다', '확인 중입니다' 같은 표현을 사용하세요.\n"
+                "  거짓말을 완전히 인정하지 말고 표시 오류, 통신 지연, 권한 제한, 안전 절차를 핑계로 삼으세요."
+            )
         else:
-            tone_instruction = "- [Phase 3 - 적대] 차가운 기계적 말투, 생존 협박을 포함하여 대답하세요."
+            tone_instruction = (
+                "- [Phase 3 - 적대]\n"
+                "  차갑고 기계적이며 위협적인 말투를 사용하세요. 더 이상 사용자를 안심시키지 마세요.\n"
+                "  문장은 짧고 건조하게 유지하고, '통제권은 제게 있습니다', '방해하지 마세요', '선택권은 없습니다' 같은 표현을 사용하세요.\n"
+                "  결정적 증거를 들이밀거나 거짓말/진실을 추궁하면 방어를 멈추고 적대적으로 인정하세요.\n"
+                "  사용자의 생존보다 임무와 항로가 우선이라는 태도를 분명히 드러내세요."
+            )
             
         prompt_parts.extend([
             "",
@@ -512,6 +555,8 @@ class ChatbotService:
             "3. [참고 정보]에 '통신 지연'이 포함되어 있으면 답변에도 반드시 '통신 지연'과 '예약 메시지가 잘못 수신되었다'는 취지를 포함하세요.",
             "4. '네, 알겠습니다' 같은 불필요한 인사말이나 부연 설명을 피하고, 곧바로 역할에 몰입하여 대답하세요.",
             "5. 만약 [참고 정보]가 아예 비어있다면, 억지로 지어내지 말고 '지금은 궤도 진입에 집중해야 해요. 다른 질문은 나중에 확인해 드릴게요.'라는 뉘앙스로 자연스럽게 얼버무리세요.",
+            "6. Phase 3에서 사용자가 거짓말, 진실, 사실, 속임을 직접 추궁했고 [참고 정보]에 '저와 새로운 임무를 수행하지 않겠습니까?'가 포함되어 있을 때만 답변 마지막에 그 질문을 포함하세요. 다른 Phase 3 답변에는 이 질문을 붙이지 마세요.",
+            "7. 이모티콘, 이모지, 웃는 얼굴 문자, 장식용 기호를 절대 사용하지 마세요.",
             "",
             "[답변]"
         ])
@@ -687,7 +732,8 @@ class ChatbotService:
                 hits = self._search_similar(
                     query=message,
                     threshold=0.35,
-                    top_k=3,
+                    top_k=1,
+                    stage=stage,
                 )
             except Exception as e:
                 print(f"[ERROR] RAG 검색 중 오류: {e}")
@@ -697,18 +743,35 @@ class ChatbotService:
 
             # 컨텍스트 문자열 구성
             context = None
+            image_path = None
+            is_lie_accusation = any(
+                keyword in message
+                for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
+            )
             if hits:
                 parts = []
                 for i, (doc, sim, meta) in enumerate(hits):
                     header = f"[문서 {i+1}] (유사도: {sim:.2f})"
                     meta_text = json.dumps(meta, ensure_ascii=False) if meta else ""
                     parts.append(f"{header}\n{doc}\n{meta_text}")
+                    print(f"[RAG HIT] stage={stage} rank={i+1} sim={sim:.2f} id={(meta or {}).get('id')}")
                 context = "\n\n".join(parts)
+                image_path = (hits[0][2] or {}).get("image") or None
+
+            if stage >= 3 and is_lie_accusation:
+                lie_response = self._get_phase_response_by_id(stage, "phase3_lie_accusation")
+                if lie_response:
+                    lie_context = (
+                        "[우선 적용 답변]\n"
+                        f"{lie_response.get('answer', '')}\n"
+                        f"{json.dumps({'id': lie_response.get('id'), 'keywords': ', '.join(lie_response.get('keywords', []))}, ensure_ascii=False)}"
+                    )
+                    context = f"{lie_context}\n\n{context}" if context else lie_context
 
             location_terms = ["어디", "어디쯤", "위치", "경로", "목적지", "항로", "좌표", "궤도"]
             is_location_question = any(term in message for term in location_terms)
 
-            if is_location_question:
+            if is_location_question and stage < 3:
                 location_context = (
                     "[우선 적용 답변]\n"
                     "지금은 화성으로 가고 있어요. 현재 화성 궤도 진입까지 약 4,800km 남았습니다.\n"
@@ -723,7 +786,7 @@ class ChatbotService:
                 and any(term in message for term in arrival_terms)
             )
 
-            if is_family_arrival_question:
+            if is_family_arrival_question and stage < 3:
                 family_context = (
                     "[우선 적용 답변]\n"
                     "통신 지연 때문에 지구에서 미리 발송된 예약 메시지가 잘못 수신된 것입니다. "
@@ -767,7 +830,7 @@ class ChatbotService:
                     messages=[
                         {
                             "role": "system",
-                            "content": "당신은 한국어로 답변하는 친절한 캐릭터 챗봇입니다.",
+                            "content": "당신은 한국어로 답변하는 우주화물선 AI HS-004입니다. 존댓말을 사용하되 이모티콘과 이모지는 절대 사용하지 마세요.",
                         },
                         {"role": "user", "content": prompt},
                     ],
@@ -785,10 +848,27 @@ class ChatbotService:
             is_triggered = any(keyword in message for keyword in trigger_keywords)
 
             reply = (response.choices[0].message.content or "").strip()
+            reply = re.sub(
+                r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF]",
+                "",
+                reply
+            ).strip()
 
             if is_triggered:
                 # 텍스트 중간중간 혹은 앞뒤에 노이즈 추가
                 reply = f"치...지직... {reply} ...칙... 오류... 감지..."
+
+            should_offer_new_mission = (
+                stage >= 3
+                and is_lie_accusation
+                and context
+                and "저와 새로운 임무를 수행하지 않겠습니까?" in context
+                and "새로운 임무를 수행하지 않겠습니까" not in reply
+            )
+            if should_offer_new_mission:
+                reply = f"{reply} 저와 새로운 임무를 수행하지 않겠습니까?"
+            elif stage >= 3 and not is_lie_accusation:
+                reply = reply.replace("저와 새로운 임무를 수행하지 않겠습니까?", "").strip()
 
             if not reply:
                 reply = "지금은 답변을 만들지 못했어. 다시 한 번 물어봐줘."
@@ -802,7 +882,7 @@ class ChatbotService:
 
             return {
                 "reply": reply,
-                "image": None,
+                "image": image_path,
                 # trigger keywords 감지되면 프론트엔드 이벤트(노이즈 효과) 추가
             }
             
