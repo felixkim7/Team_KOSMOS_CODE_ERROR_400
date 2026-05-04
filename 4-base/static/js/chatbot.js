@@ -430,6 +430,7 @@ function reduceAirLevel(amount = 1) {
 
   airLevel = Math.max(0, airLevel - amount);
   airLevelText.textContent = airLevel;
+  updateOxygenOverlayText();
   const airWarningLevel = document.getElementById("air-warning-level");
   if (airWarningLevel) {
     airWarningLevel.textContent = airLevel;
@@ -468,6 +469,8 @@ function startOxygenTimer() {
         airLevelText.textContent = airLevel;
       }
 
+      updateOxygenOverlayText();
+
       const airWarningLevel = document.getElementById("air-warning-level");
       if (airWarningLevel) {
         airWarningLevel.textContent = airLevel;
@@ -481,7 +484,7 @@ function startOxygenTimer() {
     }
 
     reduceAirLevel(1);
-  }, 30000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
+  }, 10000); //Oxygen drop speed, currently at drop 1%p every 1 min (지금은 30초마다)
 }
 
 function startTimer() {
@@ -952,6 +955,14 @@ document.querySelectorAll(".modal").forEach((modal) => {
   });
 });
 
+window.addEventListener("resize", () => {
+  const oxygenOverlay = document.getElementById("oxygen-overlay");
+
+  if (oxygenOverlay && oxygenOverlay.style.display !== "none") {
+    placeOxygenOverlay();
+  }
+});
+
 // ================================
 // INITIAL LOAD
 // ================================
@@ -977,16 +988,81 @@ window.addEventListener("load", () => {
 // ================================
 // HOTSPOT & MODAL LOGIC
 // ================================
+function updateOxygenOverlayText() {
+  const oxygenOverlay = document.getElementById("oxygen-overlay");
+
+  if (!oxygenOverlay) return;
+
+  oxygenOverlay.textContent = `${airLevel}%`;
+
+  if (oxygenOverlay.style.display !== "none") {
+    placeOxygenOverlay();
+  }
+}
+
+function placeOxygenOverlay() {
+  const img = document.getElementById("clueModalImage");
+  const overlay = document.getElementById("oxygen-overlay");
+
+  if (!img || !overlay || !img.naturalWidth || !img.naturalHeight) return;
+
+  const rect = img.getBoundingClientRect();
+
+  const imgRatio = img.naturalWidth / img.naturalHeight;
+  const boxRatio = rect.width / rect.height;
+
+  let realWidth = rect.width;
+  let realHeight = rect.height;
+  let realLeft = 0;
+  let realTop = 0;
+
+  if (imgRatio > boxRatio) {
+    realHeight = rect.width / imgRatio;
+    realTop = (rect.height - realHeight) / 2;
+  } else {
+    realWidth = rect.height * imgRatio;
+    realLeft = (rect.width - realWidth) / 2;
+  }
+
+  overlay.style.left = `${realLeft + realWidth * 0.48}px`;
+  overlay.style.top = `${realTop + realHeight * 0.41}px`;
+  const fontSize = realWidth * 0.055;
+  overlay.style.fontSize = `${fontSize}px`;
+}
+
 function showClueModal(title, imageSrc) {
   const modal = document.getElementById("clueModal");
   const titleEl = document.getElementById("clueModalTitle");
   const imgEl = document.getElementById("clueModalImage");
+  const oxygenOverlay = document.getElementById("oxygen-overlay");
 
   if (modal && titleEl && imgEl) {
     titleEl.textContent = title;
     imgEl.src = imageSrc;
     imgEl.style.display = imageSrc ? "block" : "none";
     modal.style.display = "block";
+
+    // Default: hide overlay
+    if (oxygenOverlay) {
+      oxygenOverlay.style.display = "none";
+    }
+
+    // Only show overlay for oxygen tank clue
+    if (
+      oxygenOverlay &&
+      imageSrc &&
+      imageSrc.includes("cargohold_oxygenTank.png")
+    ) {
+      oxygenOverlay.textContent = `${airLevel}%`;
+      oxygenOverlay.style.display = "block";
+
+      // position of the number on the image
+      if (imgEl.complete) {
+        placeOxygenOverlay();
+      } else {
+        imgEl.onload = placeOxygenOverlay;
+      }
+    }
   }
 }
 
