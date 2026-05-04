@@ -222,15 +222,26 @@
       border-radius: 8px;
       border: 1px solid rgba(0, 229, 255, 0.28);
       background: rgba(0, 8, 14, 0.88);
-      color: #dffcff;
+      color: #6cecff;
+      font-family: "IBM Plex Sans KR", sans-serif;
       font-size: 0.95rem;
       line-height: 1.6;
       outline: none;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.42);
+      box-shadow:
+        0 0 16px rgba(0, 229, 255, 0.12),
+        inset 0 0 18px rgba(0, 229, 255, 0.06);
+      caret-color: #8ff6ff;
     }
 
     #user-memo:focus {
       border-color: #00e5ff;
       box-shadow: 0 0 14px rgba(0, 229, 255, 0.22);
+    }
+
+    #user-memo::placeholder {
+      color: rgba(108, 236, 255, 0.52);
+      text-shadow: none;
     }
 
     .location-buttons {

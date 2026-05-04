@@ -106,7 +106,6 @@ class GameState:
             "stage_label": self.stage_label,
             "location": self.current_location,
             "visited_rooms": ", ".join(self.visited_rooms),
-            "oxygen": f"{self.oxygen}%",
             "suspicion": self.ai_suspicion_level,
             "is_emergency": "예" if self.is_emergency else "아니오",
             "story_flags": ", ".join(active_flags) if active_flags else "없음",

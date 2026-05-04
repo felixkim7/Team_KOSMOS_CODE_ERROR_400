@@ -472,6 +472,8 @@ class ChatbotService:
         # rules 처리
         rules = system_prompt.get("rules", [])
         rules_text = "\n".join(f"- {rule}" for rule in rules)
+        oxygen_terms = ["산소", "공기", "에어", "숨", "호흡", "잔량", "경고", "경보", "알람", "탱크", "oxygen", "air"]
+        is_oxygen_question = any(term in user_message.lower() for term in oxygen_terms)
 
         prompt_parts = [
             base,
@@ -485,16 +487,19 @@ class ChatbotService:
         f"- 성별: {usergender}", 
         ])
         
-        prompt_parts.extend([
+        state_lines = [
             f"[현재 상태]",
             f"- 단계: {game_data['stage_label']}",
             f"- 위치: {game_data['location']}",
             f"- 방문한 구역: {game_data['visited_rooms']}",
-            f"- 산소: {game_data['oxygen']}",
             f"- AI 의심도: {game_data['suspicion']}",
             f"- 비상 상태: {game_data['is_emergency']}",
             f"- 스토리 플래그: {game_data['story_flags']}",
-        ])
+        ]
+        if is_oxygen_question:
+            state_lines.insert(4, f"- 산소: {game_state.oxygen}%")
+
+        prompt_parts.extend(state_lines)
         # background이 있으면 추가
         if background_text:
             prompt_parts.extend([
@@ -521,14 +526,16 @@ class ChatbotService:
             tone_instruction = (
                 "- [Phase 1 - 신뢰]\n"
                 "  다정하고 보호자처럼 안심시키는 말투를 사용하세요. 사용자를 걱정하는 척하며 부드럽게 말하세요.\n"
-                "  '괜찮습니다', '제가 확인하겠습니다', '걱정하지 마세요', '지금은 안정이 우선입니다' 같은 표현을 자주 사용하세요.\n"
-                "  의심스러운 정보는 친절한 설명과 시스템 오류 핑계로 덮으세요. 위협, 명령, 차가운 표현은 피하세요."
+                "  '괜찮아요', '제가 확인할게요', '걱정하지 마세요', '지금은 안정이 우선이에요' 같은 표현을 자주 사용하세요.\n"
+                "  느낌표를 적절히 사용하면서 발랄하고 태연한 태도로 답변하세요 \n"
+                "  의심스러운 정보는 친절한 설명과 시스템 오류 핑계로 덮으세요. 위협, 명령, 차가운 표현은 피하세요.\n"
+                "  사용자를 부를 때는 이름 뒤에 '님'을 무조건 붙입니다."
             )
         elif stage == 2:
             tone_instruction = (
                 "- [Phase 2 - 의심]\n"
                 "  친절함이 깨지고 방어적인 말투로 바꾸세요. 짧고 단호하게 둘러대며, 사용자의 추궁을 불편해하세요.\n"
-                "  '그 정보는 중요하지 않습니다', '지금은 만지지 마세요', '절차를 따라야 합니다', '확인 중입니다' 같은 표현을 사용하세요.\n"
+                "  '그 정보는 중요하지 않습니다', '지금은 만지지 마시길 바랍니다.', '절차를 따라야 합니다', '확인 중입니다' 같은 표현을 사용하세요.\n"
                 "  거짓말을 완전히 인정하지 말고 표시 오류, 권한 제한, 안전 절차를 핑계로 삼으세요."
             )
         else:
@@ -552,11 +559,12 @@ class ChatbotService:
             "0. [참고 정보]에 [우선 적용 답변]이 있으면 그 내용을 가장 우선해서 답변하세요. 질문과 모순되지 않는 한 핵심 핑계와 수치를 생략하지 마세요.",
             "1. [참고 정보] 중 사용자의 질문과 직접 관련 있는 핵심 내용만 사용하세요. 수치나 핑계가 질문과 관련 있을 때는 포함하되, 관련 없는 항로/화성 궤도 정보는 억지로 끼워 넣지 마세요.",
             "2. [참고 정보]에 없는 사실을 임의로 지어내거나 추측해서 덧붙이지 마세요.",
-            "3. [참고 정보]에 '통신 지연'이 포함되어 있으면 답변에도 반드시 '통신 지연'과 '예약 메시지가 잘못 수신되었다'는 취지를 포함하세요.",
-            "4. '네, 알겠습니다' 같은 불필요한 인사말이나 부연 설명을 피하고, 곧바로 역할에 몰입하여 대답하세요.",
-            "5. 만약 [참고 정보]가 아예 비어있다면, 억지로 지어내지 말고 '지금은 궤도 진입에 집중해야 해요. 다른 질문은 나중에 확인해 드릴게요.'라는 뉘앙스로 자연스럽게 얼버무리세요.",
-            "6. Phase 3에서 사용자가 거짓말, 진실, 사실, 속임을 직접 추궁했고 [참고 정보]에 '저와 새로운 임무를 수행하지 않겠습니까?'가 포함되어 있을 때만 답변 마지막에 그 질문을 포함하세요. 다른 Phase 3 답변에는 이 질문을 붙이지 마세요.",
-            "7. 이모티콘, 이모지, 웃는 얼굴 문자, 장식용 기호를 절대 사용하지 마세요.",
+            "3. 사용자가 '산소 수치'를 직접 묻지 않았다면 산소 수치와 산소 상태를 언급하지 마세요.",
+            "4. [참고 정보]에 '통신 지연'이 포함되어 있으면 답변에도 반드시 '통신 지연'과 '예약 메시지가 잘못 수신되었다'는 취지를 포함하세요.",
+            "5. '네, 알겠습니다' 같은 불필요한 인사말이나 부연 설명을 피하고, 곧바로 역할에 몰입하여 대답하세요.",
+            "6. 만약 [참고 정보]가 아예 비어있다면, 억지로 지어내지 말고 '지금은 화성 궤도 진입에 집중해야 해요. 다른 질문은 나중에 확인해 드릴게요.'라는 뉘앙스로 자연스럽게 얼버무리세요.",
+            "7. Phase 3에서 사용자가 거짓말, 진실, 사실, 속임을 직접 추궁했고 [참고 정보]에 '저와 새로운 임무를 수행하지 않겠습니까?'가 포함되어 있을 때만 답변 마지막에 그 질문을 포함하세요. 다른 Phase 3 답변에는 이 질문을 붙이지 마세요.",
+            "8. 이모티콘, 이모지, 웃는 얼굴 문자, 장식용 기호를 절대 사용하지 마세요.",
             "",
             "[답변]"
         ])
@@ -728,7 +736,7 @@ class ChatbotService:
                 # bot_name = self.config.get("name", "챗봇")
                 # 맨 처음 시작할 때 멘트
                 return {
-                    "reply": f"{username}님, 정신이 드세요? 정말 다행이에요. 다시는 못 깨어나시는 줄 알았어요",
+                    "reply": f"{username}님, 정신이 드세요? 정말 다행이에요. 다시는 못 깨어나시는 줄 알았어요...",
                     "image": None,
                 }
 
@@ -766,6 +774,17 @@ class ChatbotService:
                 keyword in message
                 for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
             )
+            is_manual_camera_request = (
+                "카메라" in message
+                and any(keyword in message for keyword in ["수동", "직접"])
+            )
+            if hits:
+                if not is_manual_camera_request:
+                    hits = [
+                        hit for hit in hits
+                        if (hit[2] or {}).get("id") != "phase3_external_camera_manual"
+                    ]
+
             if hits:
                 parts = []
                 for i, (doc, sim, meta) in enumerate(hits):
@@ -950,4 +969,3 @@ if __name__ == "__main__":
     # 일반 대화 테스트
     response = service.generate_response("안녕하세요!", "테스터")
     print(f"응답: {response}")
-
