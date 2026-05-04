@@ -3,224 +3,509 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ bot.name }} - 상세 정보</title>
+    <title>{{ bot.name }} - Prologue</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Orbitron:wght@500;700&display=swap"
       rel="stylesheet"
     />
     <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
       body {
         margin: 0;
         padding: 0;
+        width: 100%;
+        min-height: 100%;
+      }
+
+      body {
         font-family: "IBM Plex Sans KR", sans-serif;
-        background: rgba(0, 0, 0, 0.3);
+        background: #01040a;
+        color: #dffcff;
+        overflow: hidden;
+      }
+
+      /* ================================
+         BACKGROUND VIDEO
+      ================================ */
+
+      .prologue-page {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 100vh;
+        background: #01040a;
       }
-      .modal-container {
-        max-width: 500px;
-        width: 90%;
-        margin: 20px auto;
-        background: #fff;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-      }
-      .modal-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
 
-        padding: 15px 20px;
-      }
-      .modal-header h2 {
-        margin: 0;
-        flex: 1;
-        text-align: center;
-        font-size: 1.5rem;
-        color: #333;
-      }
-      .close-btn {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: #666;
-      }
-      .modal-content {
-        padding: 30px;
-      }
-      .bot-image {
+      .ship-video {
+        position: absolute;
+        inset: 0;
         width: 100%;
-        max-width: 300px;
-        height: auto;
-        border-radius: 12px;
-        display: block;
-        margin: 0 auto 20px;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.55;
+        transform: scale(1.04);
+        animation: slowZoom 22s ease-in-out forwards;
       }
-      .bot-info {
-        text-align: center;
+
+      .video-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 50% 40%, rgba(0, 229, 255, 0.08), transparent 34%),
+          radial-gradient(circle at 70% 20%, rgba(0, 102, 180, 0.2), transparent 38%),
+          linear-gradient(
+            180deg,
+            rgba(0, 0, 0, 0.72) 0%,
+            rgba(1, 7, 18, 0.66) 45%,
+            rgba(0, 0, 0, 0.86) 100%
+          );
+        z-index: 1;
       }
-      .bot-info h1 {
-        margin: 0 0 15px 0;
-        font-size: 2rem;
-        color: #333;
+
+      .scanlines {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(0, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 255, 0.025) 1px, transparent 1px),
+          linear-gradient(
+            transparent 0%,
+            rgba(0, 255, 255, 0.035) 50%,
+            transparent 100%
+          );
+        background-size: 48px 48px, 48px 48px, 100% 4px;
+        opacity: 0.55;
       }
-      .bot-info p {
-        margin: 15px 0;
-        font-size: 1rem;
-        color: #666;
-        line-height: 1.6;
+
+      .vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+        box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.95);
       }
-      .tags {
-        margin: 15px 0;
+
+      /* ================================
+         MAIN CONTENT
+      ================================ */
+
+      .prologue-panel {
+        position: relative;
+        z-index: 5;
+        width: min(92vw, 880px);
+        min-height: 620px;
+        padding: 34px 42px 38px;
+        border: 1px solid rgba(143, 246, 255, 0.32);
+        border-radius: 22px;
+        background:
+          linear-gradient(
+            135deg,
+            rgba(0, 20, 36, 0.78),
+            rgba(0, 8, 18, 0.82)
+          );
+        box-shadow:
+          0 0 36px rgba(0, 229, 255, 0.16),
+          inset 0 0 30px rgba(0, 229, 255, 0.07);
+        backdrop-filter: blur(16px);
       }
-      .tag {
+
+      .system-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(143, 246, 255, 0.18);
+        font-family: "Orbitron", sans-serif;
+        letter-spacing: 0.16em;
+        font-size: 0.78rem;
+        color: rgba(191, 255, 255, 0.78);
+      }
+
+      .system-status {
+        color: #ff9caf;
+        animation: blink 1.6s infinite;
+      }
+
+      .title-area {
+        margin-bottom: 28px;
+      }
+
+      .main-title {
+        margin: 0;
+        font-family: "Orbitron", sans-serif;
+        font-size: clamp(2rem, 5vw, 4rem);
+        letter-spacing: 0.16em;
+        color: #e8feff;
+        text-shadow:
+          0 0 12px rgba(0, 229, 255, 0.9),
+          0 0 32px rgba(0, 100, 255, 0.62);
+        opacity: 0;
+        animation: fadeSlide 1.1s ease forwards;
+        animation-delay: 0.5s;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.82rem;
+        letter-spacing: 0.18em;
+        color: rgba(143, 246, 255, 0.72);
+        opacity: 0;
+        animation: fadeSlide 1.1s ease forwards;
+        animation-delay: 1.2s;
+      }
+
+      .story-sequence {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 20px;
+      }
+
+      .story-block {
+        opacity: 0;
+        transform: translateY(12px);
+        color: rgba(223, 252, 255, 0.9);
+        font-size: clamp(1rem, 1.8vw, 1.18rem);
+        line-height: 1.75;
+        word-break: keep-all;
+        animation: fadeSlide 1s ease forwards;
+      }
+
+      .story-block strong {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      .story-block:nth-child(1) {
+        animation-delay: 2.1s;
+      }
+
+      .story-block:nth-child(2) {
+        animation-delay: 3.8s;
+      }
+
+      .story-block:nth-child(3) {
+        animation-delay: 5.5s;
+      }
+
+      .story-block:nth-child(4) {
+        animation-delay: 7.2s;
+      }
+
+      .story-block:nth-child(5) {
+        animation-delay: 8.9s;
+      }
+
+      .story-block:nth-child(6) {
+        animation-delay: 10.8s;
+      }
+
+      .ai-name {
         display: inline-block;
-        background: #e0e0e0;
-        color: #555;
-        padding: 6px 12px;
-        border-radius: 15px;
-        margin: 4px;
+        font-family: "Orbitron", sans-serif;
+        color: #8ff6ff;
+        text-shadow:
+          0 0 10px rgba(0, 229, 255, 0.95),
+          0 0 24px rgba(0, 229, 255, 0.55);
+        animation: microGlitch 2.8s infinite;
+      }
+
+      .hidden-truth {
+        color: #ffb3c1;
+        text-shadow:
+          0 0 10px rgba(255, 68, 105, 0.82),
+          0 0 22px rgba(0, 229, 255, 0.38);
+        animation: truthFlicker 2.2s infinite;
+      }
+
+      .objective-panel {
+        opacity: 0;
+        transform: translateY(12px);
+        margin: 22px 0 4px;
+        padding: 16px 18px;
+        border: 1px solid rgba(143, 246, 255, 0.28);
+        border-radius: 14px;
+        background: rgba(0, 18, 30, 0.55);
+        box-shadow: inset 0 0 22px rgba(0, 229, 255, 0.06);
+        animation: fadeSlide 1s ease forwards;
+        animation-delay: 9.5s;
+      }
+
+      .objective-title {
+        margin-bottom: 8px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.78rem;
+        letter-spacing: 0.16em;
+        color: #8ff6ff;
+      }
+
+      .objective-list {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .objective-list li {
+        padding: 10px 12px;
+        border: 1px solid rgba(143, 246, 255, 0.18);
+        background: rgba(0, 229, 255, 0.06);
+        color: rgba(223, 252, 255, 0.84);
         font-size: 0.9rem;
       }
-      .username-area {
-        margin: 20px 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
+
+      /* ================================
+        CONTINUE BUTTON
+      ================================ */
+
+      .continue-panel {
+        opacity: 0;
+        transform: translateY(12px);
+        margin-top: 26px;
+        padding-top: 22px;
+        border-top: 1px solid rgba(143, 246, 255, 0.18);
+        animation: fadeSlide 1s ease forwards;
+        animation-delay: 13s;
       }
-      .username-area label {
-        font-size: 1rem;
-        color: #333;
-      }
-      .username-area input {
-        padding: 8px 12px;
-        font-size: 1rem;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        width: 50%;
-        transition: border 0.2s;
-      }
-      .username-area input:focus {
-        outline: none;
-        border-color: #764ba2;
-      }
-      .usergender-area {
-        margin: 20px 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-      }
-      .usergender-area label {
-        font-size: 1rem;
-        color: #333;
-      }
-      .usergender-area select {
-        padding: 8px 12px;
-        font-size: 1rem;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        width: 50%;
-        transition: border 0.2s;
-      }
-      .usergender-area select:focus {
-        outline: none;
-        border-color: #764ba2;
-      }
-      .start-chat {
+
+      .continue-btn {
         display: block;
-        margin: 20px 0;
-        padding: 12px 20px;
-        background: #764ba2;
-        color: #fff;
+        width: 100%;
+        padding: 16px 20px;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 229, 255, 0.46);
+        background: linear-gradient(90deg, #001923, #003a5a, #001923);
+        color: #bfffff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
         text-decoration: none;
-        border-radius: 8px;
-        font-size: 1.1rem;
         text-align: center;
-        cursor: pointer;
-        transition: transform 0.2s;
+        box-shadow:
+          0 0 20px rgba(0, 229, 255, 0.38),
+          inset 0 0 18px rgba(0, 229, 255, 0.18);
+        transition: 0.2s;
       }
-      .start-chat:hover {
+
+      .continue-btn:hover {
+        color: #ffffff;
         transform: translateY(-2px);
+        box-shadow:
+          0 0 28px rgba(0, 229, 255, 0.72),
+          inset 0 0 22px rgba(255, 255, 255, 0.18);
+      }
+
+      .continue-note {
+        margin-top: 12px;
+        text-align: center;
+        font-size: 0.78rem;
+        color: rgba(191, 255, 255, 0.45);
+      }
+
+      /* ================================
+         ANIMATIONS
+      ================================ */
+
+      @keyframes fadeSlide {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes slowZoom {
+        from {
+          transform: scale(1.04);
+        }
+        to {
+          transform: scale(1.11);
+        }
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @keyframes microGlitch {
+        0%,
+        92%,
+        100% {
+          transform: translate(0, 0);
+          opacity: 1;
+        }
+        94% {
+          transform: translate(1px, -1px);
+          opacity: 0.75;
+        }
+        96% {
+          transform: translate(-1px, 1px);
+          opacity: 1;
+        }
+      }
+
+      @keyframes truthFlicker {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        45% {
+          opacity: 1;
+        }
+        47% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 760px) {
+        body {
+          overflow: auto;
+        }
+
+        .prologue-page {
+          min-height: 100vh;
+          height: auto;
+          padding: 28px 0;
+        }
+
+        .prologue-panel {
+          min-height: auto;
+          padding: 28px 22px;
+        }
+
+        .system-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .objective-list {
+          grid-template-columns: 1fr;
+        }
+
+        
       }
     </style>
   </head>
   <body>
-    <div class="modal-container">
-      <div class="modal-header">
-        <h2>{{ bot.name }}</h2>
-        <button
-          class="close-btn"
-          onclick="window.location.href='{{ url_for('index') }}'"
-        >
-          &times;
-        </button>
-      </div>
+    <main class="prologue-page">
+      <!-- Change this src to your actual ship video path -->
+      <video class="ship-video" autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='videos/chatbot/intro_1.mp4') }}" type="video/mp4" />
+      </video>
 
-      <div class="modal-content">
-        <img
-          src="./static/images/hateslop/logo_black_genai.png"
-          alt="{{ bot.name }}"
-          class="bot-image"
-        />
+      <div class="video-overlay"></div>
+      <div class="scanlines"></div>
+      <div class="vignette"></div>
 
-        <div class="bot-info">
-          <h1>{{ bot.name }}</h1>
-
-          <!-- <div class="tags">
-            {% for tag in bot.tags %}
-            <span class="tag">{{ tag }}</span>
-            {% endfor %}
-          </div> -->
+      <section class="prologue-panel">
+        <div class="system-header">
+          <span>MARS RELOCATION PROJECT // YEAR 10</span>
+          <span class="system-status">RECOVERY SEQUENCE ACTIVE</span>
         </div>
 
-        <div>프롤로그</div>
-
-        <div class="username-area">
-          <label for="username">이름:</label>
-          <input type="text" id="username" placeholder="이름을 입력하세요" />
+        <div class="title-area">
+          <h1 class="main-title">MISSION LOG</h1>
+          <div class="subtitle">HS-400 // AUTONOMOUS CARGO CONTROL SYSTEM</div>
         </div>
-        <!-- <div class="usergender-area">
-          <label for="usergender">성별:</label>
-          <input type="text" id="usergender" placeholder="성별을 입력하세요" />
-        </div> -->
-        <div class="usergender-area">
-          <label for="usergender">성별:</label>
-          <select name="usergender" id = "usergender">
-            <option value="">성별을 선택하세요</option>
-            <option value = "남성">남성</option>
-            <option value = "여성">여성</option>
-          </select>
-          <!-- <input type="text" id="usergender" placeholder="성별을 입력하세요" /> -->
-        </div>  
 
-        <a href="#" class="start-chat" id="start-chat-btn">우주 항해 시작하기</a>
-      </div>
-    </div>
+        <div class="story-sequence">
+          <!-- Section 1: Setting -->
+          <p class="story-block">
+            <strong>서기 2085년.</strong><br />
+            황폐해진 지구를 떠나 인류가 화성 이주 계획을 수립한 지
+            10년이 되었다.
+          </p>
+
+          <!-- Section 2: Player role -->
+          <p class="story-block">
+            당신은 화성 기지 건설에 필수적인 자재를 운송하는
+            <strong>우주 배달부</strong>다.
+          </p>
+
+          <!-- Section 3: Incident -->
+          <p class="story-block">
+            항해 중 예기치 못한 사고로 정신을 잃었던 당신은
+            함내에서 홀로 깨어난다.
+          </p>
+
+          <!-- Section 4: HS-400 introduction -->
+          <p class="story-block">
+            기억을 잃은 당신의 곁에는 상냥한 가이드 AI
+            <span class="ai-name">HS-400</span>이 대기하고 있다.
+          </p>
+
+          <!-- Section 5: Apparent mission objective -->
+          <p class="story-block">
+            당신의 목표는 화성 궤도 진입을 앞두고 함내 시스템을 점검하여
+            맡은 화물을 무사히 배달하는 것이다.
+          </p>
+
+          <div class="objective-panel">
+            <div class="objective-title">PRIMARY OBJECTIVE</div>
+            <ul class="objective-list">
+              <li>Inspect onboard systems</li>
+              <li>Secure mission cargo</li>
+              <li>Complete Mars delivery</li>
+            </ul>
+          </div>
+
+          <!-- Section 6: Hidden tension -->
+          <p class="story-block">
+            인류의 새로운 희망을 실은 이 항해의 끝에서,<br />
+            당신은 무사히 임무를 완수하고
+            <span class="hidden-truth">대화 속에 숨겨진 진실</span>을
+            마주해야 한다.
+          </p>
+        </div>
+
+        <div class="continue-panel">
+          <a href="#" class="continue-btn" id="continue-btn">
+            PROCEED TO CREW IDENTIFICATION
+          </a>
+
+          <div class="continue-note">
+            Identity verification required before HS-400 connection.
+          </div>
+        </div>
+      </section>
+    </main>
 
     <script>
-      const startChatBtn = document.getElementById("start-chat-btn");
-      const usernameInput = document.getElementById("username");
-      const usergenderInput = document.getElementById("usergender");
+      const continueBtn = document.getElementById("continue-btn");
 
-      startChatBtn.addEventListener("click", function (event) {
+      continueBtn.addEventListener("click", function (event) {
         event.preventDefault();
-        const username = usernameInput.value.trim() || "사용자";
-        const usergender = usergenderInput.value.trim() || "미정";
-        window.location.href = `/chat?username=${encodeURIComponent(username)}&usergender=${encodeURIComponent(usergender)}`;
-      });
-
-      usernameInput.addEventListener("keypress", function (event) {
-        if (event.key === "Enter") {
-          startChatBtn.click();
-        }
+        window.location.href = "/detail";
       });
     </script>
   </body>
