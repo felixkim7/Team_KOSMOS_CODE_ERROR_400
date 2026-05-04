@@ -144,18 +144,14 @@ const areaButtonLabels = {
 
 const hintsByStage = {
   1: [
-    "내가 얼마나 잤지?",
-    "지금 어디쯤이야?",
-    "산소는 왜 떨어진 거지?",
-  ],
-  2: [
-    "화물칸이 왜 텅 비어있어?",
-    "산소 탱크가 손상된 것 같은데?",
+      "내가 얼마나 오래 기절해 있었어?", 
+      "지금 우리 위치가 어디쯤이야?",
+      "산소가 왜 줄어든 거야?" 
   ],
   3: [
-    "속도가 너무 빠른데?",
-    "너 지구로 가려는 목적이 뭐야?",
-    "지금 카메라가 이상한데?",
+    "속도가 너무 빠른데. 정상 맞아?",
+    "지금 정말 화성으로 가고 있어?",
+    "외부 카메라 수동 모드로 전환해줘.",
   ],
 };
 
@@ -336,7 +332,12 @@ function appendCockpitEntryChoice() {
   btn.addEventListener("click", () => {
     btn.remove();
     unlockStage(3);
-    toggleArea("cockpit");
+    if (cockpitBtn) {
+      cockpitBtn.classList.remove("locked");
+      cockpitBtn.click();
+    } else {
+      toggleArea("cockpit");
+    }
   });
 
   chatLog.appendChild(btn);

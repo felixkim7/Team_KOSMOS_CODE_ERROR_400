@@ -742,6 +742,19 @@ class ChatbotService:
                     "image": None,
                 }
 
+            is_lie_accusation = any(
+                keyword in message
+                for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
+            )
+
+            if stage >= 3 and is_lie_accusation:
+                lie_response = self._get_phase_response_by_id(stage, "phase3_lie_accusation")
+                if lie_response:
+                    return {
+                        "reply": lie_response.get("answer", ""),
+                        "image": lie_response.get("image") or None,
+                    }
+
             # RAG 검색: 상위 문서들을 가져와 컨텍스트로 사용
             try:
                 hits = self._search_similar(
@@ -772,10 +785,6 @@ class ChatbotService:
             # 컨텍스트 문자열 구성
             context = None
             image_path = None
-            is_lie_accusation = any(
-                keyword in message
-                for keyword in ["거짓", "구라", "뻥", "거짓말", "진실", "사실", "속였", "숨겼", "믿으라고"]
-            )
             is_manual_camera_request = (
                 "카메라" in message
                 and any(keyword in message for keyword in ["수동", "직접"])
@@ -796,16 +805,6 @@ class ChatbotService:
                     print(f"[RAG HIT] stage={stage} rank={i+1} sim={sim:.2f} id={(meta or {}).get('id')}")
                 context = "\n\n".join(parts)
                 image_path = (hits[0][2] or {}).get("image") or None
-
-            if stage >= 3 and is_lie_accusation:
-                lie_response = self._get_phase_response_by_id(stage, "phase3_lie_accusation")
-                if lie_response:
-                    lie_context = (
-                        "[우선 적용 답변]\n"
-                        f"{lie_response.get('answer', '')}\n"
-                        f"{json.dumps({'id': lie_response.get('id'), 'keywords': ', '.join(lie_response.get('keywords', []))}, ensure_ascii=False)}"
-                    )
-                    context = f"{lie_context}\n\n{context}" if context else lie_context
 
             location_terms = ["어디", "어디쯤", "위치", "경로", "목적지", "항로", "좌표", "궤도"]
             is_location_question = any(term in message for term in location_terms)
