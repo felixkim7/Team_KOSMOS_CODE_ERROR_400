@@ -118,6 +118,39 @@
       display: none;
     }
 
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .audio-toggle-btn {
+      height: 42px;
+      padding: 0 12px;
+      border-radius: 8px;
+      background: rgba(0, 18, 30, 0.35);
+      border: 1px solid rgba(143, 246, 255, 0.45);
+      color: #bfffff;
+      font-family: "Orbitron", sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      box-shadow:
+        0 0 14px rgba(0, 229, 255, 0.12),
+        inset 0 0 18px rgba(0, 229, 255, 0.04);
+      transition: 0.2s;
+    }
+
+    .audio-toggle-btn:hover {
+      color: #ffffff;
+      background: rgba(0, 229, 255, 0.13);
+      border-color: rgba(143, 246, 255, 0.9);
+      box-shadow:
+        0 0 18px rgba(0, 229, 255, 0.45),
+        inset 0 0 18px rgba(0, 229, 255, 0.12);
+    }
+
     .close-btn {
       width: auto;
       height: 48px;
@@ -702,6 +735,11 @@
         width: 100%;
       }
 
+      .top-controls {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
       .status-card {
         flex: 1;
         min-width: 150px;
@@ -753,9 +791,14 @@
         </div>
       </div>
 
-      <button class="close-btn" onclick="window.location.href='{{ url_for('index') }}'">
-        항해를 종료
-      </button>
+      <div class="top-controls">
+        <button class="audio-toggle-btn" id="sfx-toggle" type="button">SFX: ON</button>
+        <button class="audio-toggle-btn" id="bgm-toggle" type="button">BGM: ON</button>
+
+        <button class="close-btn" onclick="window.location.href='{{ url_for('index') }}'">
+          항해를 종료
+        </button>
+      </div>
     </header>
 
     <!-- Air Level Warning Box -->
@@ -868,7 +911,7 @@
 
       <div id="clueModalImageWrap" class="clue-modal-image-wrap">
         <img id="clueModalImage" src="" alt="Clue Detail" />
-        <video id="clueModalVideo" autoplay muted loop playsinline></video>
+        <video id="clueModalVideo" autoplay loop playsinline></video>
 
         <div id="oxygen-overlay">
           20%
@@ -876,6 +919,10 @@
       </div>
     </div>
   </div>
+
+  <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="auto" loop></audio>
+  <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="auto" loop></audio>
+  <script src="{{ url_for('static', filename='js/audio-controls.js') }}"></script>
 
   <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
 </body>
