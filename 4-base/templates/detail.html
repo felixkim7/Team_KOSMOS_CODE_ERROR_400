@@ -94,6 +94,34 @@
         text-shadow: 0 0 12px rgba(0, 229, 255, 0.9);
       }
 
+      .modal-header-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .audio-toggle-btn {
+        padding: 7px 10px;
+        border: 1px solid rgba(143, 246, 255, 0.35);
+        border-radius: 8px;
+        background: rgba(0, 18, 30, 0.55);
+        color: #bfffff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow:
+          0 0 12px rgba(0, 229, 255, 0.14),
+          inset 0 0 12px rgba(0, 229, 255, 0.06);
+      }
+
+      .audio-toggle-btn:hover {
+        color: #ffffff;
+        border-color: rgba(143, 246, 255, 0.85);
+        background: rgba(0, 229, 255, 0.12);
+      }
+
       .status {
         font-size: 0.75rem;
         color: #ff4d6d;
@@ -303,6 +331,16 @@
           padding: 26px 20px;
         }
 
+        .modal-header {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .modal-header-controls {
+          width: 100%;
+          justify-content: flex-end;
+        }
+
         .bot-info h1 {
           font-size: 1.9rem;
         }
@@ -320,12 +358,18 @@
         <div class="modal-header">
           <span class="status">WARNING: ROUTE DEVIATION</span>
           <h2>{{ bot.name }}</h2>
-          <button
-            class="close-btn"
-            onclick="history.back()"
-          >
-            &times;
-          </button>
+
+          <div class="modal-header-controls">
+            <button class="audio-toggle-btn" id="sfx-toggle" type="button">SFX: ON</button>
+            <button class="audio-toggle-btn" id="bgm-toggle" type="button">BGM: ON</button>
+
+            <button
+              class="close-btn"
+              onclick="history.back()"
+            >
+              &times;
+            </button>
+          </div>
         </div>
       </div>
 
@@ -387,6 +431,10 @@
         </div>
       </div>
     </div>
+
+    <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="auto" loop></audio>
+    <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="auto" loop></audio>
+    <script src="{{ url_for('static', filename='js/audio-controls.js') }}"></script>
 
     <script>
       const startChatBtn = document.getElementById("start-chat-btn");

@@ -48,13 +48,19 @@ let timerSeconds = 10 * 60;
 let openedArea = null;
 let messageIdCounter = 0;
 let responseVideoTimeout = null;
+let currentClueModalTitle = "";
 
 let oxygenTimerStarted = false;
 let oxygenTimerId = null;
+let oxygenWarningSfxPlayed = false;
+
 let alarmQueryCount = 0;
 let earthOrbitChoiceShown = false;
 let awaitingOrbitReturnCode = false;
 let gameEnded = false;
+let stage3LoopSfxStarted = false;
+window.stage3SfxShouldBePlaying = false;
+
 let hasOfferedNewMission = false;
 let hasRevealedNewMission = false;
 let hasOfferedCockpitEntry = false;
@@ -230,6 +236,11 @@ function goToStartPage() {
 function showBadEnding() {
   if (gameEnded) return;
 
+  stopStage3LoopSfx();
+
+  window.playSfx?.("stage3Ambient", 0.55);
+  window.playSfx?.("reentry", 0.85);
+
   gameEnded = true;
   awaitingOrbitReturnCode = false;
 
@@ -243,7 +254,7 @@ function showBadEnding() {
   endingOverlay.innerHTML = `
     <div class="ending-panel">
       <div class="ending-kicker">BAD ENDING</div>
-      <video class="ending-video" src="/static/videos/chatbot/ending_crash.mp4" autoplay muted playsinline></video>
+      <video class="ending-video" src="/static/videos/chatbot/ending_crash.mp4" autoplay playsinline></video>
       <h2>COLLISION COURSE LOCKED</h2>
       <p>지구 궤도 진입 승인. HS-004호는 충돌 경로를 이탈하지 못했습니다.</p>
 
@@ -274,8 +285,13 @@ function showBadEnding() {
 function completeOrbitReturn() {
   if (gameEnded) return;
 
+  stopStage3LoopSfx();
+  window.playSfx?.("divert", 0.85);
+
   awaitingOrbitReturnCode = false;
   gameEnded = true;
+
+
 
   if (responseVideoTimeout) {
     clearTimeout(responseVideoTimeout);
@@ -420,29 +436,28 @@ function updateHints() {
 
   hintRow.innerHTML = "";
 
-  let hints;
+  let hints = [];
 
   // Even if Stage 2 is unlocked, keep showing Stage 1 questions
   // until the player actually enters Cargo Bay.
-  if (currentStage === 2 && !hasEnteredCargoBay) {
-    hints = hintsByStage[1];
-  } 
-  
-  else if (currentStage === 3 && !hasEnteredCockpit) {
-    if (hasEnteredCargoBay) {
-      hints = hintsByStage[2];
-    } else {
-      hints = hintsByStage[1];
-    }
 
+  if (currentStage === 1) {
+    hints = hintsByStage[1];
   }
-   
-  else if (currentStage === 3 && !hasFoundAllPhase3Clues()) {
+
+  else if (currentStage === 2) {
+    // Stage 2 has no recommended questions.
     hints = [];
   }
 
-  else {
-    hints = hintsByStage[currentStage] || hintsByStage[1];
+  
+  else if (currentStage === 3) {
+    // Stage 3 recommended questions appear after entering the cockpit.
+    if (hasFoundAllPhase3Clues()) {
+      hints = hintsByStage[3];
+    } else {
+      hints = [];
+    }
   }
 
   hints.forEach((question) => {
@@ -466,6 +481,25 @@ function updateLocationButtonLabels() {
   });
 }
 
+function startStage3LoopSfx() {
+  if (gameEnded) return;
+  if (stage3LoopSfxStarted) return;
+
+  stage3LoopSfxStarted = true;
+  window.stage3SfxShouldBePlaying = true;
+
+  window.playLoopingSfx?.("stage3Ambient", 0.25);
+  window.playLoopingSfx?.("velocityWarning", 0.45);
+}
+
+function stopStage3LoopSfx() {
+  stage3LoopSfxStarted = false;
+  window.stage3SfxShouldBePlaying = false;
+
+  window.stopLoopingSfx?.("stage3Ambient");
+  window.stopLoopingSfx?.("velocityWarning");
+}
+
 function unlockStage(stage) {
   currentStage = Math.max(currentStage, stage);
 
@@ -487,6 +521,7 @@ function unlockStage(stage) {
     }
 
     startTimer();
+    startStage3LoopSfx();
   }
 
   updateHints();
@@ -509,7 +544,13 @@ function reduceAirLevel(amount = 1) {
 
   if (warningBox) {
     if (currentStage < 2 && airLevel <= 15) {
+      const wasHidden = warningBox.classList.contains("hidden");
       warningBox.classList.remove("hidden");
+      
+      if (wasHidden && !oxygenWarningSfxPlayed) {
+        window.playSfx?.("oxygenWarning", 0.75);
+        oxygenWarningSfxPlayed = true;
+      }
     } else {
       warningBox.classList.add("hidden");
     }
@@ -1009,7 +1050,17 @@ function closeModal(modalId) {
     modal.style.display = "none";
   }
 
+  
+
   if (modalId === "clueModal") {
+    if (currentClueModalTitle === "MESSAGE LOG") {
+      window.playSfx?.("messageOpen", 0.65);
+    }
+
+    currentClueModalTitle = "";
+
+    window.stopLoopingSfx?.("oxygenLeak");
+
     const videoEl = document.getElementById("clueModalVideo");
 
     if (videoEl) {
@@ -1128,6 +1179,7 @@ function showClueModal(title, mediaSrc) {
   if (!modal || !titleEl || !imgEl || !videoEl) return;
 
   titleEl.textContent = title;
+  currentClueModalTitle = title;
 
   // Reset image
   imgEl.style.display = "none";
@@ -1151,6 +1203,9 @@ function showClueModal(title, mediaSrc) {
   if (mediaSrc && mediaSrc.toLowerCase().endsWith(".mp4")) {
     videoEl.src = mediaSrc;
     videoEl.style.display = "block";
+
+    videoEl.muted = localStorage.getItem("sfxEnabled") === "false";
+    videoEl.volume = 0.8;
 
     videoEl.play().catch((err) => {
       console.warn("Modal video play failed:", err);
@@ -1232,6 +1287,7 @@ window.addEventListener("load", () => {
   const hotspotMessage = document.getElementById("hotspot-message");
   if (hotspotMessage) {
     hotspotMessage.addEventListener("click", () => {
+      window.playSfx?.("messageOpen", 0.65);
       addClueMemo("message");
       showClueModal("MESSAGE LOG", "/static/images/chatbot/LivingArea_message.png");
     });
@@ -1248,6 +1304,7 @@ window.addEventListener("load", () => {
   const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
   if (hotspotCargoOxygen) {
     hotspotCargoOxygen.addEventListener("click", () => {
+      window.playLoopingSfx?.("oxygenLeak", 0.55);
       addClueMemo("cargoOxygen");
       showClueModal("OXYGEN TANK", "/static/images/chatbot/cargohold_oxygenTank.png");
     });

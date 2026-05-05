@@ -144,6 +144,40 @@
         animation: blink 1.6s infinite;
       }
 
+      .system-header-right {
+        display: flex;
+        align-items: center;
+        gap: clamp(8px, 1vw, 14px);
+        margin-left: auto;
+      }
+
+      .audio-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .audio-toggle-btn {
+        padding: 6px 10px;
+        border: 1px solid rgba(143, 246, 255, 0.35);
+        border-radius: 8px;
+        background: rgba(0, 18, 30, 0.55);
+        color: #bfffff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        box-shadow:
+          0 0 12px rgba(0, 229, 255, 0.14),
+          inset 0 0 12px rgba(0, 229, 255, 0.06);
+      }
+
+      .audio-toggle-btn:hover {
+        color: #ffffff;
+        border-color: rgba(143, 246, 255, 0.85);
+        background: rgba(0, 229, 255, 0.12);
+      }
+
       .title-area {
         margin-bottom: clamp(14px, 2vh, 22px);
       }
@@ -422,6 +456,12 @@
           gap: 8px;
         }
 
+        .system-header-right {
+          width: 100%;
+          justify-content: space-between;
+          margin-left: 0;
+        }
+
         .objective-list {
           grid-template-columns: 1fr;
         }
@@ -444,7 +484,14 @@
       <section class="prologue-panel">
         <div class="system-header">
           <span>MARS RELOCATION PROJECT // YEAR 10</span>
-          <span class="system-status">RECOVERY SEQUENCE ACTIVE</span>
+          <div class="system-header-right">
+            <span class="system-status">RECOVERY SEQUENCE ACTIVE</span>
+
+            <div class="audio-controls">
+              <button class="audio-toggle-btn" id="sfx-toggle" type="button">SFX: ON</button>
+              <button class="audio-toggle-btn" id="bgm-toggle" type="button">BGM: ON</button>
+            </div>
+          </div>
         </div>
 
         <div class="title-area">
@@ -515,6 +562,10 @@
         </div>
       </section>
     </main>
+
+    <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="auto" loop></audio>
+    <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="auto" loop></audio>
+    <script src="{{ url_for('static', filename='js/audio-controls.js') }}"></script>
 
     <script>
       const continueBtn = document.getElementById("continue-btn");
