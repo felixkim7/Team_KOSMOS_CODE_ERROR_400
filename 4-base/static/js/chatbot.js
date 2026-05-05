@@ -76,15 +76,15 @@ const requiredPhase3Clues = [
 ];
 
 const clueMemoEntries = {
-  food: "보급 식량 상자에 식량이 2개 밖에 없다.",
-  system: "시스템 화면에는 여러 수치들이 있다.",
-  message: "아빠 메세지는 화성에 도착했다고 축하해주는 내용이다.",
-  cargoEmpty: "배달 화물칸에 화물이 없다.",
-  cargoOxygen: "산소 탱크가 손상되어 있다. 산소 경보와 산소 잔량 감소의 직접 원인으로 보인다.",
-  cockpitMainInterface: "주 항법 인터페이스가 정상적인 화성 궤도 진입과 다른 항로를 가리키고 있다.",
-  cockpitSubInterface: "보조 인터페이스에 비정상적인 속도라고 경고가 나오고 있다.",
-  cockpitCamera: "조종실 카메라가 자동으로 되어있고, 화성이 보이고 있는데 화면에 노이즈가 껴있다.",
-  cockpitOrderMessage: "HS-004를 폐기하라는 명령이 담긴 메시지 파일이 있다.",
+  food: "식량이 두 개밖에 안 남았네.",
+  system: "시스템 수치는 정상으로 보이는데…",
+  message: "아빠가 보낸 화성 도착 축하 메시지라고…?",
+  cargoEmpty: "화물칸이 비어 있어… 분명 뭔가 실었을 텐데.",
+  cargoOxygen: "산소 탱크가 손상된 것 같아… 경보랑 산소 감소 원인이 이건가.",
+  cockpitMainInterface: "메인 인터페이스.. 화성이 아니라 지구 궤도를 향하고 있다고?",
+  cockpitSubInterface: "보조 인터페이스에 속도 경고가 떴어… 이거 괜찮은 건가.",
+  cockpitCamera: "카메라는 자동 모드고… 화성이 보이긴 하는데 화면에 노이즈가 심해.",
+  cockpitOrderMessage: "HS-004를 폐기하라는 명령… 이게 뭐지."
 };
 
 function addClueMemo(clueId) {
