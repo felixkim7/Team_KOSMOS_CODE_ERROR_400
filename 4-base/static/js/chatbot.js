@@ -1079,7 +1079,7 @@ async function sendMessage(isInitial = false) {
     }
 
     // [알람 추궁 트리거] 알람 발생 이후 산소에 대해 물어보면 '화물칸으로 이동' 버튼 생성
-    const alarmKeywords = ["산소", "산소 탱크", "산소탱크", '경보', '알람', '경고', '경보음', '알림', '산소 부족', '산소 떨어진', '공기'];
+    const alarmKeywords = ["산소", "산소 탱크", "산소탱크", '경보', '알람', '경고', '경보음', '알림', '산소 부족', '산소 떨어진', '공기', '점검', '확인'];
     const hasAlarmKeyword = alarmKeywords.some(kw => message && message.includes(kw));
 
     if (hasAlarmKeyword && airLevel <= 15 && !hasEnteredCargoBay) {
