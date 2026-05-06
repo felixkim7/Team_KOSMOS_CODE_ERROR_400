@@ -51,7 +51,7 @@ let responseVideoTimeout = null;
 let currentClueModalTitle = "";
 
 let isComposingText = false;
-let ignoreEnterAfterComposition = false;
+let sendAfterComposition = false;
 
 let oxygenTimerStarted = false;
 let oxygenTimerId = null;
@@ -1131,12 +1131,14 @@ if (userMessageInput) {
   userMessageInput.addEventListener("compositionend", () => {
     isComposingText = false;
 
-    // Some browsers fire an extra Enter right after Korean IME composition ends.
-    ignoreEnterAfterComposition = true;
+    if (sendAfterComposition) {
+      sendAfterComposition = false;
 
-    setTimeout(() => {
-      ignoreEnterAfterComposition = false;
-    }, 0);
+      // Wait until the Korean character is fully committed into the input.
+      setTimeout(() => {
+        sendMessage();
+      }, 0);
+    }
   });
 
   userMessageInput.addEventListener("keydown", (event) => {
@@ -1145,12 +1147,8 @@ if (userMessageInput) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (
-      isComposingText ||
-      event.isComposing ||
-      event.keyCode === 229 ||
-      ignoreEnterAfterComposition
-    ) {
+    if (isComposingText || event.isComposing || event.keyCode === 229) {
+      sendAfterComposition = true;
       return;
     }
 
