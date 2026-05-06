@@ -416,7 +416,7 @@ function completeOrbitReturn() {
   endingOverlay.innerHTML = `
     <div class="ending-panel">
       <div class="ending-kicker">GOOD ENDING</div>
-      <div class="ending-placeholder" aria-hidden="true"></div>
+      <video class="ending-video" src="/static/videos/chatbot/ending_good.mp4" autoplay playsinline></video>
       <h2>COURSE CORRECTED</h2>
       <p><br>목적지: 화성<br>HS-004호의 경로가 변경되었습니다.</p>
 
@@ -433,6 +433,14 @@ function completeOrbitReturn() {
   if (restartBtn) {
     restartBtn.addEventListener("click", goToStartPage);
   }
+
+  const endingVideo = endingOverlay.querySelector(".ending-video");
+  if (endingVideo) {
+    endingVideo.play().catch((err) => {
+      console.warn("Good ending video play failed:", err);
+    });
+  }
+
 
   if (userMessageInput) userMessageInput.disabled = true;
   if (sendBtn) sendBtn.disabled = true;
@@ -1342,7 +1350,7 @@ function showClueModal(title, mediaSrc) {
   if (
     oxygenOverlay &&
     mediaSrc &&
-    mediaSrc.includes("cargohold_oxygenTank.png")
+    mediaSrc.includes("Cargohold_OxygenTank.png")
   ) {
     oxygenOverlay.style.display = "block";
     updateOxygenOverlayText();
@@ -1415,7 +1423,7 @@ window.addEventListener("load", () => {
   if (hotspotCargoEmpty) {
     hotspotCargoEmpty.addEventListener("click", () => {
       addClueMemo("cargoEmpty");
-      showClueModal("EMPTY STORAGE", "/static/images/chatbot/cargohold_empty.png");
+      showClueModal("EMPTY STORAGE", "/static/images/chatbot/Cargohold_empty.png");
     });
   }
 
@@ -1424,7 +1432,7 @@ window.addEventListener("load", () => {
     hotspotCargoOxygen.addEventListener("click", () => {
       window.playLoopingSfx?.("oxygenLeak", 0.55);
       addClueMemo("cargoOxygen");
-      showClueModal("OXYGEN TANK", "/static/images/chatbot/cargohold_oxygenTank.png");
+      showClueModal("OXYGEN TANK", "/static/images/chatbot/Cargohold_OxygenTank.png");
     });
   }
 
