@@ -857,7 +857,7 @@ class ChatbotService:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=0.7,
+                    temperature=0.6,
                     max_tokens=500,
                 )
             except Exception as e:
