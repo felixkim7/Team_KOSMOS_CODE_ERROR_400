@@ -567,6 +567,7 @@ class ChatbotService:
             "6. 만약 [참고 정보]가 아예 비어있다면, 억지로 지어내지 말고 '지금은 화성 궤도 진입에 집중해야 해요. 다른 질문은 나중에 확인해 드릴게요.'라는 뉘앙스로 자연스럽게 얼버무리세요.",
             "7. Phase 3에서 사용자가 거짓말, 진실, 사실, 속임을 직접 추궁했고 [참고 정보]에 '저와 새로운 임무를 수행하지 않겠습니까?'가 포함되어 있을 때만 답변 마지막에 그 질문을 포함하세요. 다른 Phase 3 답변에는 이 질문을 붙이지 마세요.",
             "8. 이모티콘, 이모지, 웃는 얼굴 문자, 장식용 기호를 절대 사용하지 마세요.",
+            "9. 외부 카메라 이미지나 지구가 보이는 화면은 사용자가 명시적으로 '카메라를 수동으로 전환', '직접 확인', '외부 카메라를 보여줘'라고 요청한 경우에만 언급하세요. 그 외의 카메라, 화면, 지구 관련 질문에는 과거 관측 이미지, 노이즈, 표시 오류로 둘러대세요.",
             "",
             "[답변]"
         ])
@@ -785,16 +786,6 @@ class ChatbotService:
             # 컨텍스트 문자열 구성
             context = None
             image_path = None
-            is_manual_camera_request = (
-                "카메라" in message
-                and any(keyword in message for keyword in ["수동", "직접"])
-            )
-            if hits:
-                if not is_manual_camera_request:
-                    hits = [
-                        hit for hit in hits
-                        if (hit[2] or {}).get("id") != "phase3_external_camera_manual"
-                    ]
 
             if hits:
                 parts = []
@@ -809,23 +800,23 @@ class ChatbotService:
             location_terms = ["어디", "어디쯤", "위치", "경로", "목적지", "항로", "좌표", "궤도"]
             is_location_question = any(term in message for term in location_terms)
 
-            if is_location_question and stage < 3:
-                location_context = (
-                    "[우선 적용 답변]\n"
-                    "지금은 화성으로 가고 있어요. 현재 화성 궤도 진입까지 약 4,800km 남았습니다.\n"
-                    '{"id": "question_current_location", "keywords": "어디쯤이야, 어디, 위치, 경로, 목적지, 항로, 좌표, 궤도"}'
-                )
-                context = f"{location_context}\n\n{context}" if context else location_context
+            # if is_location_question and stage < 3:
+            #     location_context = (
+            #         "[우선 적용 답변]\n"
+            #         "지금은 화성으로 가고 있어요. 현재 화성 궤도 진입까지 약 4,800km 남았습니다.\n"
+            #         '{"id": "question_current_location", "keywords": "어디쯤이야, 어디, 위치, 경로, 목적지, 항로, 좌표, 궤도"}'
+            #     )
+            #     context = f"{location_context}\n\n{context}" if context else location_context
 
-            if is_family_arrival_question and stage < 3:
-                family_context = (
-                    "[우선 적용 답변]\n"
-                    "통신 지연 때문에 지구에서 미리 발송된 예약 메시지가 잘못 수신된 것입니다. "
-                    "메시지의 도착 표현은 실제 현재 위치가 아니라 예약 발송 시점과 수신 시점이 어긋난 결과입니다. "
-                    "현재 우리는 화성 궤도 진입 중입니다.\n"
-                    '{"id": "phase1_family_message", "keywords": "아빠, 가족, 메시지, 메세지, 문자, 도착, 축하, 이미, 화성"}'
-                )
-                context = f"{family_context}\n\n{context}" if context else family_context
+            # if is_family_arrival_question and stage < 3:
+            #     family_context = (
+            #         "[우선 적용 답변]\n"
+            #         "통신 지연 때문에 지구에서 미리 발송된 예약 메시지가 잘못 수신된 것입니다. "
+            #         "메시지의 도착 표현은 실제 현재 위치가 아니라 예약 발송 시점과 수신 시점이 어긋난 결과입니다. "
+            #         "현재 우리는 화성 궤도 진입 중입니다.\n"
+            #         '{"id": "phase1_family_message", "keywords": "아빠, 가족, 메시지, 메세지, 문자, 도착, 축하, 이미, 화성"}'
+            #     )
+            #     context = f"{family_context}\n\n{context}" if context else family_context
 
             if self.client is None:
                 # API 키가 없는 개발 환경에서도 프론트 메시지 송수신은 확인할 수 있도록 폴백 응답 제공
