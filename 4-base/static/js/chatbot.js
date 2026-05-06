@@ -73,6 +73,7 @@ const requiredPhase3Clues = [
   "cockpitMainInterface",
   "cockpitSubInterface",
   "cockpitCamera",
+  "cockpitOrderMessage",
 ];
 
 const clueMemoEntries = {
@@ -158,6 +159,7 @@ const hintsByStage = {
     "속도가 너무 빠른데. 정상 맞아?",
     "지금 정말 화성으로 가고 있어?",
     "외부 카메라 수동 모드로 전환해줘.",
+    "이 ‘폐기 예정’ 문서는 뭐야?",
   ],
 };
 
@@ -185,6 +187,111 @@ const stageVideos = {
 // MESSAGE FUNCTIONS
 // ================================
 
+function appendBotTextWithGlitchEffects(container, text) {
+  const glitchParts = [
+    "치...지직...",
+    "...칙...",
+    "오류...",
+    "감지..."
+  ];
+
+  const rawText = String(text || "");
+  const isCorruptedResponse = glitchParts.some((part) => rawText.includes(part));
+
+  const glitchPattern = /(치\.\.\.지직\.\.\.|\.\.\.칙\.\.\.|오류\.\.\.|감지\.\.\.)/g;
+  const parts = rawText.split(glitchPattern);
+
+  parts.forEach((part) => {
+    if (!part) return;
+
+    if (glitchParts.includes(part)) {
+      const span = document.createElement("span");
+      span.textContent = part;
+      span.classList.add("ai-glitch-text");
+      container.appendChild(span);
+      return;
+    }
+
+    const wordParts = part.split(/(\s+)/);
+
+    wordParts.forEach((wordPart) => {
+      if (!wordPart) return;
+
+      const span = document.createElement("span");
+      span.textContent = wordPart;
+
+      // Only make normal words flicker candidates for corrupted responses.
+      if (
+        isCorruptedResponse &&
+        !/^\s+$/.test(wordPart) &&
+        /[가-힣a-zA-Z0-9]/.test(wordPart) &&
+        wordPart.length >= 2
+      ) {
+        span.classList.add("bot-word");
+      }
+
+      container.appendChild(span);
+    });
+  });
+
+  // Only corrupted responses get random word flicker.
+  if (isCorruptedResponse) {
+    startRandomWordFlicker(container);
+  }
+}
+
+function startRandomWordFlicker(container) {
+  const candidates = Array.from(container.querySelectorAll(".bot-word"));
+
+  if (candidates.length === 0) return;
+
+  function pickRandomWord() {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  function flickerOneWord() {
+    if (!document.body.contains(container)) return;
+
+    const word = pickRandomWord();
+    if (!word) return;
+
+    word.classList.add("ai-random-flicker");
+
+    const flickerDuration = 420 + Math.random() * 420;
+
+    setTimeout(() => {
+      word.classList.remove("ai-random-flicker");
+    }, flickerDuration);
+
+    const nextDelay = 220 + Math.random() * 450;
+    setTimeout(flickerOneWord, nextDelay);
+  }
+
+  function microGlitchOneWord() {
+    if (!document.body.contains(container)) return;
+
+    const word = pickRandomWord();
+    if (!word) return;
+
+    word.classList.add("ai-glitch-text");
+
+    const glitchDuration = 700 + Math.random() * 650;
+
+    setTimeout(() => {
+      word.classList.remove("ai-glitch-text");
+    }, glitchDuration);
+
+    const nextDelay = 350 + Math.random() * 650;
+    setTimeout(microGlitchOneWord, nextDelay);
+  }
+
+  const firstFlickerDelay = 180 + Math.random() * 300;
+  const firstMicroGlitchDelay = 300 + Math.random() * 450;
+
+  setTimeout(flickerOneWord, firstFlickerDelay);
+  setTimeout(microGlitchOneWord, firstMicroGlitchDelay);
+}
+
 function appendMessage(sender, text, imageSrc = null) {
   const messageId = `msg-${messageIdCounter++}`;
   const messageElem = document.createElement("div");
@@ -205,7 +312,13 @@ function appendMessage(sender, text, imageSrc = null) {
 
     const textContainer = document.createElement("div");
     textContainer.classList.add("bot-text-container");
-    textContainer.textContent = text;
+
+    if (sender === "bot") {
+      appendBotTextWithGlitchEffects(textContainer, text);
+    } else {
+      textContainer.textContent = text;
+    }
+
     messageElem.appendChild(textContainer);
   }
 
@@ -631,13 +744,17 @@ function toggleArea(areaKey) {
 
   const hotspotCargoEmpty = document.getElementById("hotspot-cargo-empty");
   const hotspotCargoOxygen = document.getElementById("hotspot-cargo-oxygen");
+
   const hotspotCockpitMainInterface = document.getElementById("hotspot-cockpit-main-interface");
   const hotspotCockpitSubInterface = document.getElementById("hotspot-cockpit-sub-interface");
   const hotspotCockpitCamera = document.getElementById("hotspot-cockpit-camera");
+  const hotspotCockpitOrderMessage = document.getElementById("hotspot-cockpit-order-message");
+
   const cockpitHotspots = [
     hotspotCockpitMainInterface,
     hotspotCockpitSubInterface,
     hotspotCockpitCamera,
+    hotspotCockpitOrderMessage,
   ];
 
   if (openedArea === areaKey) {
@@ -793,6 +910,7 @@ async function sendMessage(isInitial = false) {
       if (document.getElementById("hotspot-cockpit-main-interface")) document.getElementById("hotspot-cockpit-main-interface").style.display = "none";
       if (document.getElementById("hotspot-cockpit-sub-interface")) document.getElementById("hotspot-cockpit-sub-interface").style.display = "none";
       if (document.getElementById("hotspot-cockpit-camera")) document.getElementById("hotspot-cockpit-camera").style.display = "none";
+      if (document.getElementById("hotspot-cockpit-order-message")) document.getElementById("hotspot-cockpit-order-message").style.display = "none";
     }
 
     // reduceAirLevel(1);    //use when wish to drop oxygen level when message is passed
@@ -1334,4 +1452,13 @@ window.addEventListener("load", () => {
       showClueModal("COCKPIT CAMERA", "/static/videos/chatbot/Cockpit_camera.mp4");
     });
   }
+
+  const hotspotCockpitOrderMessage = document.getElementById("hotspot-cockpit-order-message");
+  if (hotspotCockpitOrderMessage) {
+    hotspotCockpitOrderMessage.addEventListener("click", () => {
+      addClueMemo("cockpitOrderMessage");
+      showClueModal("COCKPIT ORDER MESSAGE", "/static/images/chatbot/Cockpit_Order_Message.png");
+    });
+  }
 });
+
