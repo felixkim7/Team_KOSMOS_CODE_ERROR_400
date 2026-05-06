@@ -49,6 +49,7 @@ let openedArea = null;
 let messageIdCounter = 0;
 let responseVideoTimeout = null;
 let currentClueModalTitle = "";
+let isSendingMessage = false;
 
 let oxygenTimerStarted = false;
 let oxygenTimerId = null;
@@ -891,6 +892,9 @@ function setChatBackgroundVideo(mode = "idle") {
 
 async function sendMessage(isInitial = false) {
   if (gameEnded) return;
+  if (isSendingMessage) return;
+
+  isSendingMessage = true;
 
   let message;
 
@@ -1113,6 +1117,8 @@ async function sendMessage(isInitial = false) {
       "SYSTEM ERROR: HS-004 응답 모듈과 연결할 수 없습니다."
     );
     setChatBackgroundVideo("idle");
+  } finally {
+    isSendingMessage = false;
   }
 }
 
@@ -1124,6 +1130,7 @@ if (userMessageInput) {
   userMessageInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
+      event.stopPropagation();
       sendMessage();
     }
   });
