@@ -27,8 +27,17 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
 
 # 개발 환경 설정
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+IS_DEVELOPMENT = os.getenv('FLASK_ENV') == 'development'
+app.config['TEMPLATES_AUTO_RELOAD'] = IS_DEVELOPMENT
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 if IS_DEVELOPMENT else 60 * 60 * 24 * 30
+
+
+@app.after_request
+def add_cache_headers(response):
+    """Cache static assets in production to reduce Render bandwidth."""
+    if not IS_DEVELOPMENT and request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=2592000"
+    return response
 
 # 프로젝트 루트 경로
 BASE_DIR = Path(__file__).resolve().parent

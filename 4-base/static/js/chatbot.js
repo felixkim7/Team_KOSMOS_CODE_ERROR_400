@@ -49,6 +49,7 @@ let openedArea = null;
 let messageIdCounter = 0;
 let responseVideoTimeout = null;
 let currentClueModalTitle = "";
+let isSendingMessage = false;
 
 let isComposingText = false;
 let sendAfterComposition = false;
@@ -167,6 +168,7 @@ const hintsByStage = {
 };
 
 const chatBgVideo = document.getElementById("chat-bg-video");
+const ENABLE_RESPONSE_VIDEOS = false;
 
 const stageVideos = {
   1: {
@@ -872,7 +874,8 @@ function setChatBackgroundVideo(mode = "idle") {
   if (!chatBgVideo) return;
 
   const videoInfo = stageVideos[currentStage] || stageVideos[1];
-  const nextSrc = videoInfo[mode] || videoInfo.idle;
+  const effectiveMode = ENABLE_RESPONSE_VIDEOS ? mode : "idle";
+  const nextSrc = videoInfo[effectiveMode] || videoInfo.idle;
 
   if (chatBgVideo.src.endsWith(nextSrc)) {
     return;
@@ -894,6 +897,7 @@ function setChatBackgroundVideo(mode = "idle") {
 
 async function sendMessage(isInitial = false) {
   if (gameEnded) return;
+  if (isSendingMessage) return;
 
   let message;
 
@@ -949,6 +953,9 @@ async function sendMessage(isInitial = false) {
   }
 
   const loadingId = appendMessage("bot", "생각 중...");
+  isSendingMessage = true;
+  if (sendBtn) sendBtn.disabled = true;
+  if (userMessageInput) userMessageInput.disabled = true;
   setChatBackgroundVideo("responding");
 
   try {
@@ -1116,6 +1123,15 @@ async function sendMessage(isInitial = false) {
       "SYSTEM ERROR: HS-004 응답 모듈과 연결할 수 없습니다."
     );
     setChatBackgroundVideo("idle");
+  } finally {
+    isSendingMessage = false;
+    if (!gameEnded) {
+      if (sendBtn) sendBtn.disabled = false;
+      if (userMessageInput) {
+        userMessageInput.disabled = false;
+        userMessageInput.focus();
+      }
+    }
   }
 }
 
@@ -1496,4 +1512,3 @@ window.addEventListener("load", () => {
     });
   }
 });
-

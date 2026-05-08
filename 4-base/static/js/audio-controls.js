@@ -31,6 +31,10 @@ const oneShotSfx = {
   divert: new Audio("/static/audio/chatbot/Divert.mp3"),
 };
 
+Object.values(oneShotSfx).forEach((sound) => {
+  sound.preload = "none";
+});
+
 
 
 function updateAudioButtonLabels() {
@@ -48,12 +52,9 @@ function applyBgmState() {
 
   pageBgm.volume = 0.35;
   pageBgm.loop = true;
+  pageBgm.preload = "none";
 
-  if (bgmEnabled) {
-    pageBgm.play().catch(() => {
-      // Browser may block autoplay until the user clicks.
-    });
-  } else {
+  if (!bgmEnabled) {
     pageBgm.pause();
   }
 }
@@ -69,12 +70,9 @@ function applySfxState() {
     if (track.id === "alarm-loop-sfx") {
       track.volume = 0.35;
     }
+    track.preload = "none";
 
-    if (sfxEnabled) {
-      track.play().catch(() => {
-        // Browser may block autoplay until the user clicks.
-      });
-    } else {
+    if (!sfxEnabled) {
       track.pause();
     }
   });
@@ -148,7 +146,7 @@ function unlockBgmAfterFirstClick() {
     ambientSfx.play().catch(() => {});
   }
 
-  document.removeEventListener("click", unlockAudioAfterFirstClick);
+  document.removeEventListener("click", unlockBgmAfterFirstClick);
 }
 
 if (sfxToggleBtn) {

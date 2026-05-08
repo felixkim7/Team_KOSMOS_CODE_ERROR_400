@@ -473,7 +473,7 @@
   <body>
     <main class="prologue-page">
       <!-- Change this src to your actual ship video path -->
-      <video class="ship-video" autoplay muted playsinline>
+      <video class="ship-video" autoplay muted playsinline preload="metadata">
         <source src="{{ url_for('static', filename='videos/chatbot/intro_1.mp4') }}" type="video/mp4" />
       </video>
 
@@ -563,8 +563,8 @@
       </section>
     </main>
 
-    <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="auto" loop></audio>
-    <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="auto" loop></audio>
+    <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="none" loop></audio>
+    <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="none" loop></audio>
     <script src="{{ url_for('static', filename='js/audio-controls.js') }}"></script>
 
     <script>

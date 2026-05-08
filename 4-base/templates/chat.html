@@ -929,7 +929,7 @@
       </aside>
 
       <section class="chat-panel">
-        <video id="chat-bg-video" autoplay muted loop playsinline>
+        <video id="chat-bg-video" autoplay muted loop playsinline preload="metadata">
           <source src="/static/videos/chatbot/AI_P1_Wait.mp4" type="video/mp4">
         </video>
         <div id="chat-log"></div>
@@ -1011,8 +1011,8 @@
     </div>
   </div>
 
-  <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="auto" loop></audio>
-  <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="auto" loop></audio>
+  <audio id="page-bgm" src="{{ url_for('static', filename='audio/chatbot/Holst_Mars.mp3') }}" preload="none" loop></audio>
+  <audio id="ambient-sfx" src="{{ url_for('static', filename='audio/chatbot/Ambient.mp3') }}" preload="none" loop></audio>
   <script src="{{ url_for('static', filename='js/audio-controls.js') }}"></script>
 
   <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
